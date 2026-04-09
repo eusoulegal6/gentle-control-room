@@ -4,11 +4,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 
 const statusVariant: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
-  sent: "outline",
-  delivered: "default",
-  read: "secondary",
-  failed: "destructive",
+  PENDING: "outline",
+  DELIVERED: "default",
+  READ: "secondary",
 };
+
+function formatStatus(status: string) {
+  return status.charAt(0) + status.slice(1).toLowerCase();
+}
 
 const AlertHistory = () => {
   const { alerts } = useAdmin();
@@ -41,9 +44,9 @@ const AlertHistory = () => {
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <div className="w-7 h-7 rounded-full gradient-primary flex items-center justify-center text-primary-foreground font-semibold text-xs flex-shrink-0">
-                          {alert.username.charAt(0).toUpperCase()}
+                          {alert.recipientUsername.charAt(0).toUpperCase()}
                         </div>
-                        <span className="font-medium">{alert.username}</span>
+                        <span className="font-medium">{alert.recipientUsername}</span>
                       </div>
                     </TableCell>
                     <TableCell className="max-w-xs">
@@ -51,11 +54,11 @@ const AlertHistory = () => {
                     </TableCell>
                     <TableCell>
                       <Badge variant={statusVariant[alert.status] || "outline"}>
-                        {alert.status}
+                        {formatStatus(alert.status)}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-muted-foreground text-sm whitespace-nowrap">
-                      {alert.sentAt.toLocaleString()}
+                      {new Date(alert.createdAt).toLocaleString()}
                     </TableCell>
                   </TableRow>
                 ))}

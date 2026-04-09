@@ -17,3 +17,8 @@ Backend API domains:
 - Admin authentication and session refresh.
 - Desktop user CRUD with password hashing.
 - Alert creation, retrieval, delivery acknowledgement, and read acknowledgement.
+
+Windows desktop packaging:
+- Desktop host project: `desktop/GentleControlRoom.Desktop`
+- Installer script: `installer/GentleControlRoom.iss`
+- Build/package guide: `docs/windows-desktop-installer.md`

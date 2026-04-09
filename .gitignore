@@ -13,6 +13,10 @@ dist-server
 dist-ssr
 *.local
 .env
+artifacts
+desktop\**\bin
+desktop\**\obj
+installer\Output
 dev.db
 dev.db-shm
 dev.db-wal

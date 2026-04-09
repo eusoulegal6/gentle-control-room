@@ -1,15 +1,26 @@
+import { Users, Send, CheckCircle, AlertTriangle } from "lucide-react";
+
 import { useAdmin } from "@/context/AdminContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, Send, CheckCircle, AlertTriangle } from "lucide-react";
+
+const statusStyles: Record<string, string> = {
+  PENDING: "bg-warning/10 text-warning",
+  DELIVERED: "bg-primary/10 text-primary",
+  READ: "bg-success/10 text-success",
+};
+
+function formatStatus(status: string) {
+  return status.charAt(0) + status.slice(1).toLowerCase();
+}
 
 const DashboardHome = () => {
   const { users, alerts } = useAdmin();
 
   const stats = [
     { title: "Total Users", value: users.length, icon: Users, color: "text-primary" },
-    { title: "Active Users", value: users.filter(u => u.status === "active").length, icon: CheckCircle, color: "text-success" },
+    { title: "Active Users", value: users.filter((user) => user.status === "ACTIVE").length, icon: CheckCircle, color: "text-success" },
     { title: "Alerts Sent", value: alerts.length, icon: Send, color: "text-primary" },
-    { title: "Pending Alerts", value: alerts.filter(a => a.status === "sent").length, icon: AlertTriangle, color: "text-warning" },
+    { title: "Pending Alerts", value: alerts.filter((alert) => alert.status === "PENDING").length, icon: AlertTriangle, color: "text-warning" },
   ];
 
   return (
@@ -45,10 +56,12 @@ const DashboardHome = () => {
               {alerts.slice(0, 5).map((alert) => (
                 <div key={alert.id} className="flex items-start justify-between gap-4 p-3 rounded-lg bg-muted/50">
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium">To: {alert.username}</p>
+                    <p className="text-sm font-medium">To: {alert.recipientUsername}</p>
                     <p className="text-sm text-muted-foreground truncate">{alert.message}</p>
                   </div>
-                  <StatusBadge status={alert.status} />
+                  <span className={`text-xs font-medium px-2 py-1 rounded-full flex-shrink-0 ${statusStyles[alert.status] || ""}`}>
+                    {formatStatus(alert.status)}
+                  </span>
                 </div>
               ))}
             </div>
@@ -56,20 +69,6 @@ const DashboardHome = () => {
         </CardContent>
       </Card>
     </div>
-  );
-};
-
-const StatusBadge = ({ status }: { status: string }) => {
-  const styles: Record<string, string> = {
-    sent: "bg-warning/10 text-warning",
-    delivered: "bg-primary/10 text-primary",
-    read: "bg-success/10 text-success",
-    failed: "bg-destructive/10 text-destructive",
-  };
-  return (
-    <span className={`text-xs font-medium px-2 py-1 rounded-full flex-shrink-0 ${styles[status] || ""}`}>
-      {status}
-    </span>
   );
 };
 
