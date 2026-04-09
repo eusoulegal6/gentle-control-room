@@ -50,9 +50,9 @@ interface AlertsResponse {
   alerts: Alert[];
 }
 
-async function invokeFunction<T>(name: string, options?: { method?: string; body?: unknown }): Promise<T> {
+async function invokeFunction<T>(name: string, options?: { method?: "GET" | "POST" | "PATCH" | "PUT" | "DELETE"; body?: unknown }): Promise<T> {
   const { data, error } = await supabase.functions.invoke(name, {
-    method: options?.method || 'GET',
+    method: options?.method || 'GET' as const,
     body: options?.body ? JSON.stringify(options.body) : undefined,
     headers: { 'Content-Type': 'application/json' },
   });
