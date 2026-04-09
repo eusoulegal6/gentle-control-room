@@ -25,6 +25,24 @@ export function getApiBaseUrl() {
   return (desktopApiBaseUrl ?? configuredApiBaseUrl ?? "http://127.0.0.1:3001").replace(/\/$/, "");
 }
 
+export function getEdgeFunctionsBaseUrl() {
+  const desktopApiBaseUrl = getDesktopConfig()?.apiBaseUrl;
+  if (desktopApiBaseUrl) {
+    return desktopApiBaseUrl.replace(/\/$/, "");
+  }
+
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+  if (supabaseUrl) {
+    return `${supabaseUrl.replace(/\/$/, "")}/functions/v1`;
+  }
+
+  return "http://127.0.0.1:3001/functions/v1";
+}
+
+export function getSupabaseAnonKey() {
+  return import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ?? "";
+}
+
 export async function parseApiResponse<T>(response: Response): Promise<T> {
   if (response.status === 204) {
     return null as T;
