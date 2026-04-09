@@ -434,8 +434,142 @@ const Index = () => {
         </div>
       </section>
 
+      {/* -------- DOWNLOAD & SETUP -------- */}
+      <section id="download" className="py-20 lg:py-28 bg-card/50">
+        <div className="max-w-6xl mx-auto px-6">
+          <div className="text-center max-w-2xl mx-auto mb-14">
+            <h2 className="text-3xl md:text-4xl font-bold text-foreground">
+              Download the Desktop App
+            </h2>
+            <p className="mt-4 text-muted-foreground text-lg">
+              Get the lightweight Windows agent and start receiving alerts in minutes.
+            </p>
+          </div>
+
+          <div className="grid lg:grid-cols-2 gap-12 items-start">
+            {/* Download card */}
+            <div className="animate-fade-in">
+              <Card className="shadow-elevated border-border overflow-hidden">
+                <CardContent className="p-0">
+                  <div className="gradient-primary p-8 text-center space-y-4">
+                    <div className="mx-auto w-16 h-16 rounded-2xl bg-primary-foreground/20 flex items-center justify-center">
+                      <Monitor className="w-8 h-8 text-primary-foreground" />
+                    </div>
+                    <h3 className="text-xl font-bold text-primary-foreground">
+                      Gentle Control Room for Windows
+                    </h3>
+                    <p className="text-primary-foreground/80 text-sm">
+                      Version 0.1.0 · Windows 10/11 (x64)
+                    </p>
+                    <a
+                      href="https://ipwmfdsnzjhzeofwwptk.supabase.co/storage/v1/object/public/downloads/GentleControlRoom-Setup-0.1.0.exe"
+                      download
+                    >
+                      <Button
+                        size="lg"
+                        className="bg-primary-foreground text-primary hover:bg-primary-foreground/90 gap-2 mt-2 font-semibold"
+                      >
+                        <Download className="w-5 h-5" />
+                        Download Installer
+                      </Button>
+                    </a>
+                  </div>
+                  <div className="p-6 space-y-3">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <CheckCircle className="w-4 h-4 text-success flex-shrink-0" />
+                      Runs silently in system tray
+                    </div>
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <CheckCircle className="w-4 h-4 text-success flex-shrink-0" />
+                      Minimal resource usage
+                    </div>
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <CheckCircle className="w-4 h-4 text-success flex-shrink-0" />
+                      Auto-starts with Windows
+                    </div>
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <CheckCircle className="w-4 h-4 text-success flex-shrink-0" />
+                      No admin privileges required
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Setup tutorial */}
+            <div className="space-y-6 animate-fade-in" style={{ animationDelay: "0.15s" }}>
+              <h3 className="text-xl font-bold text-foreground">Quick Setup Guide</h3>
+
+              <div className="space-y-4">
+                {[
+                  {
+                    step: 1,
+                    icon: Download,
+                    title: "Download & Install",
+                    description:
+                      "Click the download button and run the installer. Follow the on-screen prompts — it takes less than a minute.",
+                  },
+                  {
+                    step: 2,
+                    icon: UserPlus,
+                    title: "Get Your Credentials",
+                    description:
+                      "Your admin will create a username and password for you in the dashboard. Ask them for your login details.",
+                  },
+                  {
+                    step: 3,
+                    icon: LogIn,
+                    title: "Sign In to the App",
+                    description:
+                      "Open the app from your system tray and enter the username and password provided by your admin.",
+                  },
+                  {
+                    step: 4,
+                    icon: Bell,
+                    title: "Start Receiving Alerts",
+                    description:
+                      "That's it! You'll now receive desktop notifications whenever your admin sends an alert to you.",
+                  },
+                ].map((item) => (
+                  <div key={item.step} className="flex gap-4 items-start group">
+                    <div className="flex-shrink-0 w-10 h-10 rounded-xl gradient-primary flex items-center justify-center group-hover:shadow-lg transition-shadow">
+                      <item.icon className="w-5 h-5 text-primary-foreground" />
+                    </div>
+                    <div className="space-y-1">
+                      <h4 className="font-semibold text-foreground text-sm">
+                        Step {item.step}: {item.title}
+                      </h4>
+                      <p className="text-sm text-muted-foreground leading-relaxed">
+                        {item.description}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="rounded-xl border border-border bg-muted/30 p-4 mt-4">
+                <div className="flex items-start gap-3">
+                  <KeyRound className="w-5 h-5 text-primary mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="text-sm font-medium text-foreground">Need credentials?</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Contact your administrator to get your login details. They can create your
+                      account from the{" "}
+                      <Link to="/login" className="text-primary hover:underline">
+                        admin dashboard
+                      </Link>
+                      .
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* -------- DASHBOARD PREVIEW -------- */}
-      <section className="py-20 lg:py-28 bg-card/50">
+      <section className="py-20 lg:py-28">
         <div className="max-w-6xl mx-auto px-6">
           <div className="text-center max-w-2xl mx-auto mb-14">
             <h2 className="text-3xl md:text-4xl font-bold text-foreground">
