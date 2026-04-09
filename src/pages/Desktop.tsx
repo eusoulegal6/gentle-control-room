@@ -203,7 +203,10 @@ const Desktop = () => {
   };
 
   const notifyNativeHost = (alert: DesktopAlert) => {
-    if (!desktopConfig?.enableNativeNotifications) return;
+    // Skip only if config explicitly disables notifications
+    if (desktopConfig && desktopConfig.enableNativeNotifications === false) return;
+    // Skip if no bridge available
+    if (!window.chrome?.webview?.postMessage) return;
     postDesktopHostMessage({
       type: "desktop.alert.received",
       payload: {
@@ -268,17 +271,16 @@ const Desktop = () => {
       ? await desktopAlertRequest<DesktopAlertsResponse>("GET", `/desktop-alerts?userId=${sessionUser.id}`)
       : payload;
 
-    if (pendingAlerts.length > 0) {
-      const knownIds = new Set(notifiedAlertIdsRef.current);
-      const newlyDeliveredAlerts = latestPayload.alerts.filter(
-        (alert) => pendingAlerts.some((p) => p.id === alert.id) && !knownIds.has(alert.id),
-      );
-      for (const alert of newlyDeliveredAlerts) {
-        notifyNativeHost(alert);
-        knownIds.add(alert.id);
-      }
-      syncNotifiedAlertIds(knownIds);
+    // Notify for ALL unseen alerts, not just pending ones
+    const knownIds = new Set(notifiedAlertIdsRef.current);
+    const unseenAlerts = latestPayload.alerts.filter(
+      (alert) => !knownIds.has(alert.id),
+    );
+    for (const alert of unseenAlerts) {
+      notifyNativeHost(alert);
+      knownIds.add(alert.id);
     }
+    syncNotifiedAlertIds(knownIds);
 
     setAlerts(sortAlertsByNewest(latestPayload.alerts));
   };
