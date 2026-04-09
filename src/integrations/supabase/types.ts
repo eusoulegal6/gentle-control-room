@@ -14,7 +14,175 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      admin_profiles: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          role: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id: string
+          role?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          role?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      alerts: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          delivered_at: string | null
+          id: string
+          message: string
+          read_at: string | null
+          recipient_id: string
+          recipient_username: string
+          status: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          delivered_at?: string | null
+          id?: string
+          message: string
+          read_at?: string | null
+          recipient_id: string
+          recipient_username: string
+          status?: string
+          title?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          delivered_at?: string | null
+          id?: string
+          message?: string
+          read_at?: string | null
+          recipient_id?: string
+          recipient_username?: string
+          status?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "alerts_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "admin_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "alerts_recipient_id_fkey"
+            columns: ["recipient_id"]
+            isOneToOne: false
+            referencedRelation: "desktop_users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      desktop_sessions: {
+        Row: {
+          created_at: string
+          desktop_user_id: string
+          expires_at: string
+          id: string
+          ip_address: string | null
+          refresh_token_hash: string
+          revoked_at: string | null
+          updated_at: string
+          user_agent: string | null
+        }
+        Insert: {
+          created_at?: string
+          desktop_user_id: string
+          expires_at: string
+          id?: string
+          ip_address?: string | null
+          refresh_token_hash: string
+          revoked_at?: string | null
+          updated_at?: string
+          user_agent?: string | null
+        }
+        Update: {
+          created_at?: string
+          desktop_user_id?: string
+          expires_at?: string
+          id?: string
+          ip_address?: string | null
+          refresh_token_hash?: string
+          revoked_at?: string | null
+          updated_at?: string
+          user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "desktop_sessions_desktop_user_id_fkey"
+            columns: ["desktop_user_id"]
+            isOneToOne: false
+            referencedRelation: "desktop_users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      desktop_users: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          display_name: string | null
+          id: string
+          must_reset_password: boolean
+          password_hash: string
+          status: string
+          updated_at: string
+          username: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          display_name?: string | null
+          id?: string
+          must_reset_password?: boolean
+          password_hash: string
+          status?: string
+          updated_at?: string
+          username: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          display_name?: string | null
+          id?: string
+          must_reset_password?: boolean
+          password_hash?: string
+          status?: string
+          updated_at?: string
+          username?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "desktop_users_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "admin_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
