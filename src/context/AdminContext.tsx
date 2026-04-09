@@ -50,11 +50,11 @@ export const useAdmin = () => {
 };
 
 async function invokeEdgeFunction<T>(functionName: string, options?: {
-  method?: string;
+  method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   body?: unknown;
 }): Promise<T> {
   const { data, error } = await supabase.functions.invoke(functionName, {
-    method: options?.method || "GET",
+    method: options?.method || "GET" as const,
     body: options?.body ?? undefined,
   });
 
