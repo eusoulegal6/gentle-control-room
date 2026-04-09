@@ -35,7 +35,19 @@ Deno.serve(async (req) => {
     const supabase = createClient(supabaseUrl, serviceRoleKey);
     const url = new URL(req.url);
     const pathParts = url.pathname.split("/").filter(Boolean);
-    const action = pathParts[pathParts.length - 1];
+    const pathAction = pathParts[pathParts.length - 1];
+
+    // Support action from URL path OR from request body
+    let action = pathAction;
+    let body: Record<string, unknown> = {};
+
+    if (req.method === "POST") {
+      body = await req.json().catch(() => ({}));
+      // If the last path segment is the function name itself, use body.action
+      if (pathAction === "desktop-auth" && typeof body.action === "string") {
+        action = body.action;
+      }
+    }
 
     // LOGIN
     if (req.method === "POST" && action === "login") {
