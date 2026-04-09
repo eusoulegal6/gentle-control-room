@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Plus, Pencil, Trash2 } from "lucide-react";
+import { useState, useCallback } from "react";
+import { Plus, Pencil, Trash2, Copy, KeyRound } from "lucide-react";
 import { toast } from "sonner";
 
 import { useAdmin, AppUser } from "@/context/AdminContext";
@@ -30,13 +30,14 @@ function formatUserStatus(status: AppUser["status"]) {
 }
 
 const UserManagement = () => {
-  const { users, addUser, editUser, deleteUser } = useAdmin();
+  const { users, addUser, editUser, deleteUser, resetUserPassword } = useAdmin();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<AppUser | null>(null);
   const [form, setForm] = useState<UserFormState>(initialFormState);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [tempPassword, setTempPassword] = useState<{ password: string; username: string } | null>(null);
 
   const openCreate = () => {
     setEditingUser(null);
@@ -78,8 +79,11 @@ const UserManagement = () => {
         });
         toast.success("User updated successfully.");
       } else {
-        await addUser(form.username.trim(), form.password.trim(), form.displayName.trim() || null);
-        toast.success("User created successfully.");
+        const result = await addUser(form.username.trim(), form.password.trim(), form.displayName.trim() || null);
+        if (result.temporaryPassword) {
+          setTempPassword({ password: result.temporaryPassword, username: form.username.trim() });
+        }
+        toast.success("User created. Copy the password now.");
       }
 
       setDialogOpen(false);
@@ -90,6 +94,21 @@ const UserManagement = () => {
       setIsSaving(false);
     }
   };
+
+  const handleResetPassword = useCallback(async (userId: string) => {
+    try {
+      const result = await resetUserPassword(userId);
+      setTempPassword({ password: result.temporaryPassword, username: result.username });
+      toast.success("Password has been reset.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Unable to reset password.");
+    }
+  }, [resetUserPassword]);
+
+  const copyToClipboard = useCallback((text: string) => {
+    navigator.clipboard.writeText(text);
+    toast.success("Copied to clipboard.");
+  }, []);
 
   const handleDelete = async (id: string) => {
     setIsDeleting(true);
@@ -154,6 +173,9 @@ const UserManagement = () => {
                       <div className="flex justify-end gap-1">
                         <Button variant="ghost" size="sm" onClick={() => openEdit(user)}>
                           <Pencil className="w-4 h-4" />
+                        </Button>
+                        <Button variant="ghost" size="sm" title="Reset password" onClick={() => void handleResetPassword(user.id)}>
+                          <KeyRound className="w-4 h-4" />
                         </Button>
                         <Button variant="ghost" size="sm" className="hover:text-destructive" onClick={() => setDeleteConfirm(user.id)}>
                           <Trash2 className="w-4 h-4" />
@@ -262,6 +284,35 @@ const UserManagement = () => {
             >
               {isDeleting ? "Deleting..." : "Delete"}
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!tempPassword} onOpenChange={() => setTempPassword(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Temporary Password</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <p className="text-sm text-muted-foreground">
+              Save this password now. It will not be shown again.
+            </p>
+            <div className="space-y-2">
+              <Label>Username</Label>
+              <div className="font-mono text-sm bg-muted p-2 rounded">{tempPassword?.username}</div>
+            </div>
+            <div className="space-y-2">
+              <Label>Password</Label>
+              <div className="flex items-center gap-2">
+                <div className="font-mono text-sm bg-muted p-2 rounded flex-1 break-all">{tempPassword?.password}</div>
+                <Button variant="outline" size="sm" onClick={() => copyToClipboard(tempPassword?.password ?? "")}>
+                  <Copy className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button onClick={() => setTempPassword(null)}>Done</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

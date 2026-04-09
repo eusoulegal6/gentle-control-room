@@ -34,9 +34,17 @@ const Login = () => {
 
     try {
       if (isRegister) {
-        await register(email.trim(), password);
+        const result = await register(email.trim(), password);
+        if (result.error) {
+          setError(result.error);
+          return;
+        }
       } else {
-        await login(email.trim(), password);
+        const result = await login(email.trim(), password);
+        if (result.error) {
+          setError(result.error);
+          return;
+        }
       }
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : "Unable to complete authentication.");
