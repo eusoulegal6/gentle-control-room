@@ -8,6 +8,7 @@ import UserManagement from "@/components/dashboard/UserManagement";
 import SendAlert from "@/components/dashboard/SendAlert";
 import AlertHistory from "@/components/dashboard/AlertHistory";
 import DashboardHome from "@/components/dashboard/DashboardHome";
+import DesktopApp from "@/components/dashboard/DesktopApp";
 import { useAdmin } from "@/context/AdminContext";
 
 const Dashboard = () => {
@@ -38,6 +39,7 @@ const Dashboard = () => {
               <Route path="users" element={<UserManagement />} />
               <Route path="send-alert" element={<SendAlert />} />
               <Route path="alerts" element={<AlertHistory />} />
+              <Route path="desktop-app" element={<DesktopApp />} />
               <Route path="*" element={<Navigate to="/dashboard" replace />} />
             </Routes>
           </main>
