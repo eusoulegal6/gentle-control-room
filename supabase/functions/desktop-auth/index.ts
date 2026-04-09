@@ -1,6 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
 import { verifyPassword } from "../_shared/password.ts";
-import { encode as base64Encode } from "https://deno.land/std@0.224.0/encoding/base64.ts";
+import { encodeBase64 } from "https://deno.land/std@0.224.0/encoding/base64.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -13,7 +13,7 @@ const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 function generateToken(): string {
   const bytes = new Uint8Array(32);
   crypto.getRandomValues(bytes);
-  return base64Encode(bytes).replace(/[+/=]/g, (c) =>
+  return encodeBase64(bytes).replace(/[+/=]/g, (c) =>
     c === "+" ? "-" : c === "/" ? "_" : ""
   );
 }
@@ -35,11 +35,23 @@ Deno.serve(async (req) => {
     const supabase = createClient(supabaseUrl, serviceRoleKey);
     const url = new URL(req.url);
     const pathParts = url.pathname.split("/").filter(Boolean);
-    const action = pathParts[pathParts.length - 1];
+    const pathAction = pathParts[pathParts.length - 1];
+
+    // Support action from URL path OR from request body
+    let action = pathAction;
+    let body: Record<string, unknown> = {};
+
+    if (req.method === "POST") {
+      body = await req.json().catch(() => ({}));
+      // If the last path segment is the function name itself, use body.action
+      if (pathAction === "desktop-auth" && typeof body.action === "string") {
+        action = body.action;
+      }
+    }
 
     // LOGIN
     if (req.method === "POST" && action === "login") {
-      const { username, password } = await req.json();
+      const { username, password } = body as { username?: string; password?: string };
 
       if (!username || !password) {
         return new Response(JSON.stringify({ error: "Username and password are required" }), {
@@ -99,7 +111,7 @@ Deno.serve(async (req) => {
 
     // REFRESH
     if (req.method === "POST" && action === "refresh") {
-      const { refreshToken } = await req.json();
+      const { refreshToken } = body as { refreshToken?: string };
 
       if (!refreshToken) {
         return new Response(JSON.stringify({ error: "Refresh token required" }), {
@@ -149,7 +161,7 @@ Deno.serve(async (req) => {
 
     // LOGOUT
     if (req.method === "POST" && action === "logout") {
-      const { refreshToken } = await req.json();
+      const { refreshToken } = body as { refreshToken?: string };
       if (refreshToken) {
         const tokenHash = await hashToken(refreshToken);
         await supabase

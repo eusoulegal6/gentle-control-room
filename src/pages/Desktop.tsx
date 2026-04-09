@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { BellRing, RefreshCw, Shield, User } from "lucide-react";
+import { BellRing, RefreshCw, User } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -7,7 +7,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { buildJsonRequestInit, getApiBaseUrl, getDesktopConfig, parseApiResponse, postDesktopHostMessage } from "@/lib/api";
+import { buildJsonRequestInit, getDesktopConfig, getEdgeFunctionsBaseUrl, getSupabaseAnonKey, parseApiResponse, postDesktopHostMessage } from "@/lib/api";
+import { supabase } from "@/integrations/supabase/client";
 
 type DesktopAlertStatus = "PENDING" | "DELIVERED" | "READ";
 
@@ -23,7 +24,7 @@ interface DesktopAlert {
   title: string | null;
   message: string;
   status: DesktopAlertStatus;
-  senderEmail: string;
+  senderEmail?: string;
   createdAt: string;
   deliveredAt: string | null;
   readAt: string | null;
@@ -41,31 +42,10 @@ interface DesktopAlertsResponse {
   alerts: DesktopAlert[];
 }
 
-interface DesktopRealtimeAlertMessage {
-  type: "alert.created";
-  payload: DesktopAlert;
-}
-
-interface DesktopRealtimeReadyMessage {
-  type: "connection.ready";
-  payload: {
-    userId: string;
-  };
-}
-
 const DESKTOP_STORAGE_KEY = "gentle-control-room.desktop.auth";
 
 function getNotifiedAlertsStorageKey(userId: string) {
   return `gentle-control-room.desktop.notified-alerts.${userId}`;
-}
-
-function getRealtimeAlertsUrl(apiBaseUrl: string, accessToken: string) {
-  const url = new URL(apiBaseUrl);
-  url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
-  url.pathname = "/ws/desktop-alerts";
-  url.search = "";
-  url.searchParams.set("accessToken", accessToken);
-  return url.toString();
 }
 
 function sortAlertsByNewest(alerts: DesktopAlert[]) {
@@ -81,7 +61,8 @@ const badgeVariant: Record<DesktopAlertStatus, "outline" | "default" | "secondar
 };
 
 const Desktop = () => {
-  const apiBaseUrl = useMemo(() => getApiBaseUrl(), []);
+  const edgeFunctionsBaseUrl = useMemo(() => getEdgeFunctionsBaseUrl(), []);
+  const anonKey = useMemo(() => getSupabaseAnonKey(), []);
   const desktopConfig = useMemo(() => getDesktopConfig(), []);
   const pollingMs = Math.max((desktopConfig?.alertPollingSeconds ?? 15) * 1000, 5000);
   const [username, setUsername] = useState("");
@@ -94,15 +75,21 @@ const Desktop = () => {
   const [alerts, setAlerts] = useState<DesktopAlert[]>([]);
   const [sessionUser, setSessionUser] = useState<DesktopSessionUser | null>(null);
   const notifiedAlertIdsRef = useRef<Set<string>>(new Set());
-  const realtimeSocketRef = useRef<WebSocket | null>(null);
-  const realtimeReconnectTimerRef = useRef<number | null>(null);
-  const shouldReconnectRealtimeRef = useRef(false);
   const authRef = useRef<{ accessToken: string | null; refreshToken: string | null }>({
     accessToken: null,
     refreshToken: null,
   });
 
   const latestAlert = alerts[0] ?? null;
+
+  // --- Edge function request helpers ---
+
+  function edgeFunctionHeaders(extraHeaders?: HeadersInit): Headers {
+    const headers = new Headers(extraHeaders);
+    headers.set("apikey", anonKey);
+    headers.set("Content-Type", "application/json");
+    return headers;
+  }
 
   const syncAuth = (nextAuth: { accessToken: string | null; refreshToken: string | null }, nextUser: DesktopSessionUser | null) => {
     authRef.current = nextAuth;
@@ -125,53 +112,54 @@ const Desktop = () => {
 
   const refreshDesktopSession = async () => {
     const refreshToken = authRef.current.refreshToken;
-    if (!refreshToken) {
-      return false;
-    }
+    if (!refreshToken) return false;
 
-    const response = await fetch(
-      `${apiBaseUrl}/api/desktop/auth/refresh`,
-      buildJsonRequestInit("POST", { refreshToken }),
-    );
+    try {
+      const response = await fetch(`${edgeFunctionsBaseUrl}/desktop-auth`, {
+        method: "POST",
+        headers: edgeFunctionHeaders(),
+        body: JSON.stringify({ action: "refresh", refreshToken }),
+      });
 
-    if (!response.ok) {
+      if (!response.ok) {
+        syncAuth({ accessToken: null, refreshToken: null }, null);
+        return false;
+      }
+
+      const payload = await parseApiResponse<DesktopAuthResponse>(response);
+      syncAuth(
+        { accessToken: payload.tokens.accessToken, refreshToken: payload.tokens.refreshToken },
+        payload.user,
+      );
+      return true;
+    } catch {
       syncAuth({ accessToken: null, refreshToken: null }, null);
       return false;
     }
-
-    const payload = await parseApiResponse<DesktopAuthResponse>(response);
-    syncAuth(
-      {
-        accessToken: payload.tokens.accessToken,
-        refreshToken: payload.tokens.refreshToken,
-      },
-      payload.user,
-    );
-    return true;
   };
 
-  const desktopRequest = async <T,>(path: string, init?: RequestInit): Promise<T> => {
-    const headers = new Headers(init?.headers);
+  const desktopAlertRequest = async <T,>(method: string, path: string, body?: unknown): Promise<T> => {
+    const headers = edgeFunctionHeaders();
     if (authRef.current.accessToken) {
       headers.set("Authorization", `Bearer ${authRef.current.accessToken}`);
     }
 
-    const response = await fetch(`${apiBaseUrl}${path}`, {
-      ...init,
+    const response = await fetch(`${edgeFunctionsBaseUrl}${path}`, {
+      method,
       headers,
+      body: body !== undefined ? JSON.stringify(body) : undefined,
     });
 
     if (response.status === 401 && (await refreshDesktopSession())) {
-      const retryHeaders = new Headers(init?.headers);
+      const retryHeaders = edgeFunctionHeaders();
       if (authRef.current.accessToken) {
         retryHeaders.set("Authorization", `Bearer ${authRef.current.accessToken}`);
       }
-
-      const retryResponse = await fetch(`${apiBaseUrl}${path}`, {
-        ...init,
+      const retryResponse = await fetch(`${edgeFunctionsBaseUrl}${path}`, {
+        method,
         headers: retryHeaders,
+        body: body !== undefined ? JSON.stringify(body) : undefined,
       });
-
       return parseApiResponse<T>(retryResponse);
     }
 
@@ -179,9 +167,10 @@ const Desktop = () => {
   };
 
   const markAlertDelivered = async (alertId: string) => {
-    return desktopRequest<{ alert: DesktopAlert }>(
-      `/api/desktop/alerts/${alertId}/delivered`,
-      buildJsonRequestInit("POST", {}),
+    return desktopAlertRequest<{ alert: DesktopAlert }>(
+      "PATCH",
+      `/desktop-alerts/${alertId}`,
+      { status: "DELIVERED" },
     );
   };
 
@@ -191,7 +180,6 @@ const Desktop = () => {
       if (!existingAlert) {
         return sortAlertsByNewest([nextAlert, ...currentAlerts]);
       }
-
       return sortAlertsByNewest(
         currentAlerts.map((alert) => (alert.id === nextAlert.id ? { ...alert, ...nextAlert } : alert)),
       );
@@ -201,11 +189,7 @@ const Desktop = () => {
   const syncNotifiedAlertIds = (ids: Iterable<string>) => {
     const nextSet = new Set(ids);
     notifiedAlertIdsRef.current = nextSet;
-
-    if (!sessionUser) {
-      return;
-    }
-
+    if (!sessionUser) return;
     localStorage.setItem(
       getNotifiedAlertsStorageKey(sessionUser.id),
       JSON.stringify(Array.from(nextSet).slice(-200)),
@@ -219,35 +203,34 @@ const Desktop = () => {
   };
 
   const notifyNativeHost = (alert: DesktopAlert) => {
-    if (!desktopConfig?.enableNativeNotifications) {
-      return;
-    }
-
+    if (!desktopConfig?.enableNativeNotifications) return;
     postDesktopHostMessage({
       type: "desktop.alert.received",
       payload: {
         id: alert.id,
         title: alert.title ?? "New alert",
         message: alert.message,
-        senderEmail: alert.senderEmail,
+        senderEmail: alert.senderEmail ?? "",
         createdAt: alert.createdAt,
       },
     });
   };
 
   const requestHideToTray = () => {
-    postDesktopHostMessage({
-      type: "desktop.window.hideToTray",
-    });
+    postDesktopHostMessage({ type: "desktop.window.hideToTray" });
   };
 
-  const requestShowDesktopWindow = () => {
-    postDesktopHostMessage({
-      type: "desktop.window.show",
-    });
-  };
+  const handleIncomingRealtimeAlert = (row: Record<string, unknown>) => {
+    const incomingAlert: DesktopAlert = {
+      id: row.id as string,
+      title: (row.title as string) ?? "New Alert",
+      message: row.message as string,
+      status: row.status as DesktopAlertStatus,
+      createdAt: row.created_at as string,
+      deliveredAt: (row.delivered_at as string) ?? null,
+      readAt: (row.read_at as string) ?? null,
+    };
 
-  const handleIncomingRealtimeAlert = (incomingAlert: DesktopAlert) => {
     if (!notifiedAlertIdsRef.current.has(incomingAlert.id)) {
       notifyNativeHost(incomingAlert);
       noteAlertNotified(incomingAlert.id);
@@ -255,31 +238,26 @@ const Desktop = () => {
 
     const optimisticAlert: DesktopAlert =
       incomingAlert.status === "PENDING"
-        ? {
-            ...incomingAlert,
-            status: "DELIVERED",
-            deliveredAt: new Date().toISOString(),
-          }
+        ? { ...incomingAlert, status: "DELIVERED", deliveredAt: new Date().toISOString() }
         : incomingAlert;
 
     upsertAlert(optimisticAlert);
 
     void markAlertDelivered(incomingAlert.id)
-      .then((payload) => {
-        upsertAlert(payload.alert);
-      })
-      .catch(() => {
-        void fetchAlerts();
-      });
+      .then((payload) => upsertAlert(payload.alert))
+      .catch(() => void fetchAlerts());
   };
 
   const fetchAlerts = async () => {
-    if (!authRef.current.accessToken) {
+    if (!sessionUser) {
       setAlerts([]);
       return;
     }
 
-    const payload = await desktopRequest<DesktopAlertsResponse>("/api/desktop/alerts");
+    const payload = await desktopAlertRequest<DesktopAlertsResponse>(
+      "GET",
+      `/desktop-alerts?userId=${sessionUser.id}`,
+    );
     const pendingAlerts = payload.alerts.filter((item) => item.status === "PENDING");
 
     for (const alert of pendingAlerts) {
@@ -287,20 +265,18 @@ const Desktop = () => {
     }
 
     const latestPayload = pendingAlerts.length > 0
-      ? await desktopRequest<DesktopAlertsResponse>("/api/desktop/alerts")
+      ? await desktopAlertRequest<DesktopAlertsResponse>("GET", `/desktop-alerts?userId=${sessionUser.id}`)
       : payload;
 
     if (pendingAlerts.length > 0) {
       const knownIds = new Set(notifiedAlertIdsRef.current);
       const newlyDeliveredAlerts = latestPayload.alerts.filter(
-        (alert) => pendingAlerts.some((pendingAlert) => pendingAlert.id === alert.id) && !knownIds.has(alert.id),
+        (alert) => pendingAlerts.some((p) => p.id === alert.id) && !knownIds.has(alert.id),
       );
-
       for (const alert of newlyDeliveredAlerts) {
         notifyNativeHost(alert);
         knownIds.add(alert.id);
       }
-
       syncNotifiedAlertIds(knownIds);
     }
 
@@ -327,17 +303,15 @@ const Desktop = () => {
     setFeedback(null);
 
     try {
-      const response = await fetch(
-        `${apiBaseUrl}/api/desktop/auth/login`,
-        buildJsonRequestInit("POST", { username, password }),
-      );
+      const response = await fetch(`${edgeFunctionsBaseUrl}/desktop-auth`, {
+        method: "POST",
+        headers: edgeFunctionHeaders(),
+        body: JSON.stringify({ action: "login", username, password }),
+      });
       const payload = await parseApiResponse<DesktopAuthResponse>(response);
 
       syncAuth(
-        {
-          accessToken: payload.tokens.accessToken,
-          refreshToken: payload.tokens.refreshToken,
-        },
+        { accessToken: payload.tokens.accessToken, refreshToken: payload.tokens.refreshToken },
         payload.user,
       );
 
@@ -346,9 +320,7 @@ const Desktop = () => {
       setUsername("");
       setPassword("");
       await fetchAlerts();
-      window.setTimeout(() => {
-        requestHideToTray();
-      }, 400);
+      window.setTimeout(() => requestHideToTray(), 400);
     } catch (error) {
       setFeedback(error instanceof Error ? error.message : "Unable to sign in.");
       setFeedbackTone("error");
@@ -360,23 +332,15 @@ const Desktop = () => {
 
   const handleLogout = async () => {
     const refreshToken = authRef.current.refreshToken;
-
     try {
       if (refreshToken) {
-        await fetch(
-          `${apiBaseUrl}/api/desktop/auth/logout`,
-          buildJsonRequestInit("POST", { refreshToken }),
-        );
+        await fetch(`${edgeFunctionsBaseUrl}/desktop-auth`, {
+          method: "POST",
+          headers: edgeFunctionHeaders(),
+          body: JSON.stringify({ action: "logout", refreshToken }),
+        });
       }
     } finally {
-      shouldReconnectRealtimeRef.current = false;
-      if (realtimeReconnectTimerRef.current) {
-        window.clearTimeout(realtimeReconnectTimerRef.current);
-        realtimeReconnectTimerRef.current = null;
-      }
-      realtimeSocketRef.current?.close();
-      realtimeSocketRef.current = null;
-      setIsRealtimeConnected(false);
       syncAuth({ accessToken: null, refreshToken: null }, null);
       setAlerts([]);
       setFeedback("Signed out.");
@@ -386,9 +350,10 @@ const Desktop = () => {
 
   const handleMarkAsRead = async (alertId: string) => {
     try {
-      const payload = await desktopRequest<{ alert: DesktopAlert }>(
-        `/api/desktop/alerts/${alertId}/read`,
-        buildJsonRequestInit("POST", {}),
+      const payload = await desktopAlertRequest<{ alert: DesktopAlert }>(
+        "PATCH",
+        `/desktop-alerts/${alertId}`,
+        { status: "READ" },
       );
       upsertAlert(payload.alert);
     } catch (error) {
@@ -397,11 +362,10 @@ const Desktop = () => {
     }
   };
 
+  // Restore session from localStorage
   useEffect(() => {
     const storedSession = localStorage.getItem(DESKTOP_STORAGE_KEY);
-    if (!storedSession) {
-      return;
-    }
+    if (!storedSession) return;
 
     try {
       const parsed = JSON.parse(storedSession) as {
@@ -409,12 +373,8 @@ const Desktop = () => {
         refreshToken?: string;
         user?: DesktopSessionUser;
       };
-
       syncAuth(
-        {
-          accessToken: parsed.accessToken ?? null,
-          refreshToken: parsed.refreshToken ?? null,
-        },
+        { accessToken: parsed.accessToken ?? null, refreshToken: parsed.refreshToken ?? null },
         parsed.user ?? null,
       );
     } catch {
@@ -422,109 +382,82 @@ const Desktop = () => {
     }
   }, []);
 
+  // Load notified alert IDs
   useEffect(() => {
     if (!sessionUser) {
       notifiedAlertIdsRef.current = new Set();
       return;
     }
-
     const storedIds = localStorage.getItem(getNotifiedAlertsStorageKey(sessionUser.id));
     if (!storedIds) {
       notifiedAlertIdsRef.current = new Set();
       return;
     }
-
     try {
-      const parsed = JSON.parse(storedIds) as string[];
-      notifiedAlertIdsRef.current = new Set(parsed);
+      notifiedAlertIdsRef.current = new Set(JSON.parse(storedIds) as string[]);
     } catch {
       notifiedAlertIdsRef.current = new Set();
     }
   }, [sessionUser]);
 
-  useEffect(() => {
-    if (!sessionUser || !authRef.current.accessToken) {
-      shouldReconnectRealtimeRef.current = false;
-      realtimeSocketRef.current?.close();
-      realtimeSocketRef.current = null;
-      setIsRealtimeConnected(false);
-      return;
-    }
-
-    shouldReconnectRealtimeRef.current = true;
-
-    const connect = () => {
-      if (!shouldReconnectRealtimeRef.current || !authRef.current.accessToken) {
-        return;
-      }
-
-      const socket = new WebSocket(getRealtimeAlertsUrl(apiBaseUrl, authRef.current.accessToken));
-      realtimeSocketRef.current = socket;
-
-      socket.addEventListener("open", () => {
-        setIsRealtimeConnected(true);
-      });
-
-      socket.addEventListener("message", (event) => {
-        try {
-          const message = JSON.parse(event.data) as DesktopRealtimeAlertMessage | DesktopRealtimeReadyMessage;
-          if (message.type === "alert.created") {
-            handleIncomingRealtimeAlert(message.payload);
-          }
-        } catch {
-          // Ignore malformed realtime messages.
-        }
-      });
-
-      socket.addEventListener("close", () => {
-        if (realtimeSocketRef.current === socket) {
-          realtimeSocketRef.current = null;
-        }
-
-        setIsRealtimeConnected(false);
-
-        if (!shouldReconnectRealtimeRef.current) {
-          return;
-        }
-
-        realtimeReconnectTimerRef.current = window.setTimeout(() => {
-          connect();
-        }, 3000);
-      });
-
-      socket.addEventListener("error", () => {
-        socket.close();
-      });
-    };
-
-    connect();
-
-    return () => {
-      shouldReconnectRealtimeRef.current = false;
-      if (realtimeReconnectTimerRef.current) {
-        window.clearTimeout(realtimeReconnectTimerRef.current);
-        realtimeReconnectTimerRef.current = null;
-      }
-      realtimeSocketRef.current?.close();
-      realtimeSocketRef.current = null;
-      setIsRealtimeConnected(false);
-    };
-  }, [apiBaseUrl, sessionUser]);
-
+  // Supabase Realtime subscription
   useEffect(() => {
     if (!sessionUser) {
+      setIsRealtimeConnected(false);
       return;
     }
 
-    void fetchAlerts();
-
-    const timer = window.setInterval(() => {
-      void fetchAlerts();
-    }, pollingMs);
+    const channel = supabase
+      .channel(`desktop-alerts-${sessionUser.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "alerts",
+          filter: `recipient_id=eq.${sessionUser.id}`,
+        },
+        (payload) => {
+          handleIncomingRealtimeAlert(payload.new as Record<string, unknown>);
+        },
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "alerts",
+          filter: `recipient_id=eq.${sessionUser.id}`,
+        },
+        (payload) => {
+          const row = payload.new as Record<string, unknown>;
+          upsertAlert({
+            id: row.id as string,
+            title: (row.title as string) ?? "New Alert",
+            message: row.message as string,
+            status: row.status as DesktopAlertStatus,
+            createdAt: row.created_at as string,
+            deliveredAt: (row.delivered_at as string) ?? null,
+            readAt: (row.read_at as string) ?? null,
+          });
+        },
+      )
+      .subscribe((status) => {
+        setIsRealtimeConnected(status === "SUBSCRIBED");
+      });
 
     return () => {
-      window.clearInterval(timer);
+      supabase.removeChannel(channel);
+      setIsRealtimeConnected(false);
     };
+  }, [sessionUser]);
+
+  // Polling fallback
+  useEffect(() => {
+    if (!sessionUser) return;
+    void fetchAlerts();
+    const timer = window.setInterval(() => void fetchAlerts(), pollingMs);
+    return () => window.clearInterval(timer);
   }, [sessionUser, pollingMs]);
 
   if (!sessionUser) {
