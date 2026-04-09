@@ -1,6 +1,5 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-
-import { buildJsonRequestInit, getApiBaseUrl, parseApiResponse } from "@/lib/api";
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
 export interface AppUser {
   id: string;
@@ -26,13 +25,6 @@ export interface Alert {
   readAt: string | null;
 }
 
-interface AdminProfile {
-  id: string;
-  email: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
 interface AdminContextType {
   isReady: boolean;
   isLoggedIn: boolean;
@@ -49,286 +41,183 @@ interface AdminContextType {
   refreshAdminData: () => Promise<void>;
 }
 
-interface AdminAuthResponse {
-  admin: AdminProfile;
-  tokens: {
-    accessToken: string;
-    refreshToken: string;
-  };
-}
-
-interface AdminMeResponse {
-  admin: AdminProfile;
-}
-
-interface UsersResponse {
-  users: AppUser[];
-}
-
-interface AlertsResponse {
-  alerts: Alert[];
-}
-
-interface StoredAdminAuth {
-  accessToken: string;
-  refreshToken: string;
-}
-
-const ADMIN_STORAGE_KEY = "gentle-control-room.admin.auth";
 const AdminContext = createContext<AdminContextType | null>(null);
 
 export const useAdmin = () => {
   const ctx = useContext(AdminContext);
-  if (!ctx) {
-    throw new Error("useAdmin must be used within AdminProvider");
-  }
-
+  if (!ctx) throw new Error("useAdmin must be used within AdminProvider");
   return ctx;
 };
 
+async function invokeEdgeFunction<T>(functionName: string, options?: {
+  method?: string;
+  body?: unknown;
+}): Promise<T> {
+  const { data, error } = await supabase.functions.invoke(functionName, {
+    method: options?.method || "GET",
+    body: options?.body ?? undefined,
+  });
+
+  if (error) {
+    // Try to extract message from the error
+    const message = typeof error === "object" && "message" in error
+      ? (error as { message: string }).message
+      : String(error);
+    throw new Error(message);
+  }
+
+  return data as T;
+}
+
+// For edge functions that need path-based routing, we construct the full URL
+async function invokeEdgeFunctionWithPath<T>(functionName: string, path: string, options?: {
+  method?: string;
+  body?: unknown;
+}): Promise<T> {
+  const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+  const url = `https://${projectId}.supabase.co/functions/v1/${functionName}/${path}`;
+
+  const { data: { session } } = await supabase.auth.getSession();
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    "apikey": import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+  };
+
+  if (session?.access_token) {
+    headers["Authorization"] = `Bearer ${session.access_token}`;
+  }
+
+  const response = await fetch(url, {
+    method: options?.method || "GET",
+    headers,
+    body: options?.body ? JSON.stringify(options.body) : undefined,
+  });
+
+  if (response.status === 204) return null as T;
+
+  const payload = await response.json();
+
+  if (!response.ok) {
+    throw new Error(payload?.error || `Request failed with status ${response.status}`);
+  }
+
+  return payload as T;
+}
+
 export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const apiBaseUrl = useMemo(() => getApiBaseUrl(), []);
   const [isReady, setIsReady] = useState(false);
-  const [admin, setAdmin] = useState<AdminProfile | null>(null);
+  const [adminEmail, setAdminEmail] = useState("");
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [users, setUsers] = useState<AppUser[]>([]);
   const [alerts, setAlerts] = useState<Alert[]>([]);
-  const authRef = useRef<StoredAdminAuth | null>(null);
-
-  const setAuthState = useCallback((nextAuth: StoredAdminAuth | null, nextAdmin: AdminProfile | null) => {
-    authRef.current = nextAuth;
-    setAdmin(nextAdmin);
-
-    if (nextAuth) {
-      localStorage.setItem(ADMIN_STORAGE_KEY, JSON.stringify(nextAuth));
-      return;
-    }
-
-    localStorage.removeItem(ADMIN_STORAGE_KEY);
-  }, []);
-
-  const refreshSession = useCallback(async () => {
-    const refreshToken = authRef.current?.refreshToken;
-    if (!refreshToken) {
-      setAuthState(null, null);
-      return false;
-    }
-
-    const response = await fetch(
-      `${apiBaseUrl}/api/admin/auth/refresh`,
-      buildJsonRequestInit("POST", { refreshToken }),
-    );
-
-    if (!response.ok) {
-      setAuthState(null, null);
-      setUsers([]);
-      setAlerts([]);
-      return false;
-    }
-
-    const payload = await parseApiResponse<AdminAuthResponse>(response);
-    setAuthState(
-      {
-        accessToken: payload.tokens.accessToken,
-        refreshToken: payload.tokens.refreshToken,
-      },
-      payload.admin,
-    );
-    return true;
-  }, [apiBaseUrl, setAuthState]);
-
-  const adminRequest = useCallback(
-    async <T,>(path: string, init?: RequestInit): Promise<T> => {
-      const headers = new Headers(init?.headers);
-      if (authRef.current?.accessToken) {
-        headers.set("Authorization", `Bearer ${authRef.current.accessToken}`);
-      }
-
-      const response = await fetch(`${apiBaseUrl}${path}`, {
-        ...init,
-        headers,
-      });
-
-      if (response.status === 401 && (await refreshSession())) {
-        const retryHeaders = new Headers(init?.headers);
-        if (authRef.current?.accessToken) {
-          retryHeaders.set("Authorization", `Bearer ${authRef.current.accessToken}`);
-        }
-
-        const retryResponse = await fetch(`${apiBaseUrl}${path}`, {
-          ...init,
-          headers: retryHeaders,
-        });
-
-        return parseApiResponse<T>(retryResponse);
-      }
-
-      return parseApiResponse<T>(response);
-    },
-    [apiBaseUrl, refreshSession],
-  );
 
   const refreshAdminData = useCallback(async () => {
     const [usersPayload, alertsPayload] = await Promise.all([
-      adminRequest<UsersResponse>("/api/admin/users"),
-      adminRequest<AlertsResponse>("/api/admin/alerts"),
+      invokeEdgeFunction<{ users: AppUser[] }>("admin-users"),
+      invokeEdgeFunction<{ alerts: Alert[] }>("admin-alerts"),
     ]);
 
     setUsers(usersPayload.users);
     setAlerts(alertsPayload.alerts);
-  }, [adminRequest]);
+  }, []);
 
-  const applyAuthPayload = useCallback(
-    async (payload: AdminAuthResponse) => {
-      setAuthState(
-        {
-          accessToken: payload.tokens.accessToken,
-          refreshToken: payload.tokens.refreshToken,
-        },
-        payload.admin,
-      );
-      await refreshAdminData();
-    },
-    [refreshAdminData, setAuthState],
-  );
+  const login = useCallback(async (email: string, password: string) => {
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) throw new Error(error.message);
+  }, []);
 
-  const login = useCallback(
-    async (email: string, password: string) => {
-      const response = await fetch(
-        `${apiBaseUrl}/api/admin/auth/login`,
-        buildJsonRequestInit("POST", { email, password }),
-      );
-      const payload = await parseApiResponse<AdminAuthResponse>(response);
-      await applyAuthPayload(payload);
-    },
-    [apiBaseUrl, applyAuthPayload],
-  );
+  const register = useCallback(async (email: string, password: string) => {
+    const { data, error } = await supabase.auth.signUp({ email, password });
+    if (error) throw new Error(error.message);
 
-  const register = useCallback(
-    async (email: string, password: string) => {
-      const response = await fetch(
-        `${apiBaseUrl}/api/admin/auth/register`,
-        buildJsonRequestInit("POST", { email, password }),
-      );
-      const payload = await parseApiResponse<AdminAuthResponse>(response);
-      await applyAuthPayload(payload);
-    },
-    [apiBaseUrl, applyAuthPayload],
-  );
+    // Create admin profile
+    if (data.user) {
+      const { error: profileError } = await supabase
+        .from("admin_profiles")
+        .insert({ id: data.user.id, email });
+
+      if (profileError) {
+        console.error("Failed to create admin profile:", profileError);
+      }
+    }
+  }, []);
 
   const logout = useCallback(async () => {
-    const refreshToken = authRef.current?.refreshToken;
+    await supabase.auth.signOut();
+    setUsers([]);
+    setAlerts([]);
+  }, []);
 
-    try {
-      if (refreshToken) {
-        await fetch(
-          `${apiBaseUrl}/api/admin/auth/logout`,
-          buildJsonRequestInit("POST", { refreshToken }),
-        );
-      }
-    } finally {
-      setAuthState(null, null);
-      setUsers([]);
-      setAlerts([]);
-    }
-  }, [apiBaseUrl, setAuthState]);
+  const addUser = useCallback(async (username: string, password: string, displayName?: string | null) => {
+    const payload = await invokeEdgeFunction<{ user: AppUser }>("admin-users", {
+      method: "POST",
+      body: { username, password, displayName: displayName ?? null },
+    });
+    setUsers((prev) => [payload.user, ...prev]);
+  }, []);
 
-  const addUser = useCallback(
-    async (username: string, password: string, displayName?: string | null) => {
-      const payload = await adminRequest<{ user: AppUser }>(
-        "/api/admin/users",
-        buildJsonRequestInit("POST", {
-          username,
-          password,
-          displayName: displayName ?? null,
-        }),
-      );
+  const editUser = useCallback(async (id: string, input: { username?: string; password?: string; displayName?: string | null; status?: AppUser["status"] }) => {
+    const payload = await invokeEdgeFunctionWithPath<{ user: AppUser }>("admin-users", id, {
+      method: "PATCH",
+      body: input,
+    });
+    setUsers((prev) => prev.map((user) => (user.id === id ? payload.user : user)));
+  }, []);
 
-      setUsers((prev) => [payload.user, ...prev]);
-    },
-    [adminRequest],
-  );
+  const deleteUser = useCallback(async (id: string) => {
+    await invokeEdgeFunctionWithPath<null>("admin-users", id, { method: "DELETE" });
+    setUsers((prev) => prev.filter((user) => user.id !== id));
+    setAlerts((prev) => prev.filter((alert) => alert.recipientId !== id));
+  }, []);
 
-  const editUser = useCallback(
-    async (id: string, input: { username?: string; password?: string; displayName?: string | null; status?: AppUser["status"] }) => {
-      const payload = await adminRequest<{ user: AppUser }>(
-        `/api/admin/users/${id}`,
-        buildJsonRequestInit("PATCH", input),
-      );
-
-      setUsers((prev) => prev.map((user) => (user.id === id ? payload.user : user)));
-    },
-    [adminRequest],
-  );
-
-  const deleteUser = useCallback(
-    async (id: string) => {
-      await adminRequest<null>(`/api/admin/users/${id}`, {
-        method: "DELETE",
-      });
-
-      setUsers((prev) => prev.filter((user) => user.id !== id));
-      setAlerts((prev) => prev.filter((alert) => alert.recipientId !== id));
-    },
-    [adminRequest],
-  );
-
-  const sendAlert = useCallback(
-    async (userId: string, message: string, title?: string | null) => {
-      const payload = await adminRequest<{ alert: Alert }>(
-        "/api/admin/alerts",
-        buildJsonRequestInit("POST", {
-          recipientId: userId,
-          message,
-          title: title ?? null,
-        }),
-      );
-
-      setAlerts((prev) => [payload.alert, ...prev]);
-    },
-    [adminRequest],
-  );
+  const sendAlert = useCallback(async (userId: string, message: string, title?: string | null) => {
+    const payload = await invokeEdgeFunction<{ alert: Alert }>("admin-alerts", {
+      method: "POST",
+      body: { recipientId: userId, message, title: title ?? null },
+    });
+    setAlerts((prev) => [payload.alert, ...prev]);
+  }, []);
 
   useEffect(() => {
-    const storedAuth = localStorage.getItem(ADMIN_STORAGE_KEY);
+    // Set up auth state listener BEFORE checking session
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (session?.user) {
+        setAdminEmail(session.user.email ?? "");
+        setIsLoggedIn(true);
 
-    if (!storedAuth) {
-      setIsReady(true);
-      return;
-    }
-
-    try {
-      authRef.current = JSON.parse(storedAuth) as StoredAdminAuth;
-    } catch {
-      localStorage.removeItem(ADMIN_STORAGE_KEY);
-      setIsReady(true);
-      return;
-    }
-
-    const bootstrap = async () => {
-      try {
-        const mePayload = await adminRequest<AdminMeResponse>("/api/admin/auth/me");
-        setAdmin(mePayload.admin);
-        await refreshAdminData();
-      } catch {
-        const refreshed = await refreshSession();
-        if (!refreshed) {
-          setAuthState(null, null);
-        } else {
-          await refreshAdminData();
+        // Use setTimeout to avoid potential Supabase deadlock
+        if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
+          setTimeout(() => {
+            refreshAdminData().catch(console.error);
+          }, 0);
         }
-      } finally {
-        setIsReady(true);
+      } else {
+        setAdminEmail("");
+        setIsLoggedIn(false);
+        setUsers([]);
+        setAlerts([]);
       }
-    };
+      setIsReady(true);
+    });
 
-    void bootstrap();
-  }, [adminRequest, refreshAdminData, refreshSession, setAuthState]);
+    // Check existing session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        setAdminEmail(session.user.email ?? "");
+        setIsLoggedIn(true);
+        refreshAdminData().catch(console.error);
+      }
+      setIsReady(true);
+    });
+
+    return () => subscription.unsubscribe();
+  }, [refreshAdminData]);
 
   const value = useMemo<AdminContextType>(
     () => ({
       isReady,
-      isLoggedIn: Boolean(admin),
-      adminEmail: admin?.email ?? "",
+      isLoggedIn,
+      adminEmail,
       users,
       alerts,
       login,
@@ -340,7 +229,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       sendAlert,
       refreshAdminData,
     }),
-    [addUser, admin, alerts, deleteUser, editUser, isReady, login, logout, refreshAdminData, register, sendAlert, users],
+    [addUser, adminEmail, alerts, deleteUser, editUser, isLoggedIn, isReady, login, logout, refreshAdminData, register, sendAlert, users],
   );
 
   return <AdminContext.Provider value={value}>{children}</AdminContext.Provider>;
