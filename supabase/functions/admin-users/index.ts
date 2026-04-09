@@ -1,10 +1,10 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
+import { hashPassword } from "../_shared/password.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
-import * as bcrypt from "https://deno.land/x/bcrypt@v0.4.1/mod.ts";
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
 const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -51,7 +51,6 @@ Deno.serve(async (req) => {
 
     const url = new URL(req.url);
     const pathParts = url.pathname.split("/").filter(Boolean);
-    // Path: /admin-users or /admin-users/{id}
     const userId = pathParts.length > 1 ? pathParts[pathParts.length - 1] : null;
 
     // LIST
@@ -63,7 +62,6 @@ Deno.serve(async (req) => {
 
       if (error) throw error;
 
-      // Get alert counts
       const { data: alertCounts } = await supabase
         .from("alerts")
         .select("recipient_id");
@@ -100,7 +98,6 @@ Deno.serve(async (req) => {
         });
       }
 
-      // Check uniqueness
       const { data: existing } = await supabase
         .from("desktop_users")
         .select("id")
@@ -114,13 +111,13 @@ Deno.serve(async (req) => {
         });
       }
 
-      const passwordHash = await bcrypt.hash(password);
+      const password_hash = await hashPassword(password);
 
       const { data: user, error } = await supabase
         .from("desktop_users")
         .insert({
           username,
-          password_hash: passwordHash,
+          password_hash,
           display_name: displayName || null,
           created_by: adminId,
           status: "ACTIVE",
@@ -155,7 +152,7 @@ Deno.serve(async (req) => {
       if (body.displayName !== undefined) updates.display_name = body.displayName;
       if (body.status !== undefined) updates.status = body.status;
       if (body.password) {
-        updates.password_hash = await bcrypt.hash(body.password);
+        updates.password_hash = await hashPassword(body.password);
       }
 
       const { data: user, error } = await supabase
@@ -167,7 +164,6 @@ Deno.serve(async (req) => {
 
       if (error) throw error;
 
-      // Get alert count
       const { count } = await supabase
         .from("alerts")
         .select("id", { count: "exact", head: true })
@@ -193,7 +189,6 @@ Deno.serve(async (req) => {
     if (req.method === "DELETE" && userId) {
       const { error } = await supabase.from("desktop_users").delete().eq("id", userId);
       if (error) throw error;
-
       return new Response(null, { status: 204, headers: corsHeaders });
     }
 
