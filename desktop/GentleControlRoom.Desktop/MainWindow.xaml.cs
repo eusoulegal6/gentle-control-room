@@ -70,12 +70,6 @@ public partial class MainWindow : System.Windows.Window
       throw new InvalidOperationException("Microsoft Edge WebView2 Runtime is not installed.");
     }
 
-    var webRoot = Path.Combine(AppContext.BaseDirectory, "wwwroot");
-    if (!Directory.Exists(webRoot))
-    {
-      throw new DirectoryNotFoundException($"Desktop web UI assets were not found: {webRoot}");
-    }
-
     var userDataFolder = Path.Combine(
       Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
       "GentleControlRoom",
@@ -100,11 +94,6 @@ public partial class MainWindow : System.Windows.Window
       }
     };
 
-    AppWebView.CoreWebView2.SetVirtualHostNameToFolderMapping(
-      _config.WebUi.VirtualHostName,
-      webRoot,
-      CoreWebView2HostResourceAccessKind.Allow);
-
     var scriptConfig = JsonSerializer.Serialize(
       _config.ToScriptConfig(),
       new JsonSerializerOptions
@@ -116,6 +105,29 @@ public partial class MainWindow : System.Windows.Window
       $"window.__desktopConfig = Object.freeze({scriptConfig});");
 
     StatusText.Text = "Loading desktop experience...";
+
+    var hostedUrl = _config.WebUi.HostedUrl?.Trim();
+    if (!string.IsNullOrWhiteSpace(hostedUrl))
+    {
+      if (!Uri.TryCreate(hostedUrl, UriKind.Absolute, out var hostedUri))
+      {
+        throw new InvalidOperationException($"Hosted desktop URL is invalid: {hostedUrl}");
+      }
+
+      AppWebView.Source = hostedUri;
+      return;
+    }
+
+    var webRoot = Path.Combine(AppContext.BaseDirectory, "wwwroot");
+    if (!Directory.Exists(webRoot))
+    {
+      throw new DirectoryNotFoundException($"Desktop web UI assets were not found: {webRoot}");
+    }
+
+    AppWebView.CoreWebView2.SetVirtualHostNameToFolderMapping(
+      _config.WebUi.VirtualHostName,
+      webRoot,
+      CoreWebView2HostResourceAccessKind.Allow);
 
     AppWebView.Source = new Uri($"https://{_config.WebUi.VirtualHostName}/{_config.WebUi.StartPage.TrimStart('/')}");
   }
