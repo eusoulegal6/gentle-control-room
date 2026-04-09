@@ -17,7 +17,7 @@ function getRouteId(value: string | string[] | undefined) {
 const createUserSchema = z.object({
   username: z.string().min(3).max(64).transform((value) => value.trim().toLowerCase()),
   displayName: z.string().trim().max(120).optional().nullable(),
-  password: z.string().min(8).max(128),
+  password: z.string().min(1).max(128),
   status: z.nativeEnum(UserStatus).optional(),
 });
 
@@ -25,7 +25,7 @@ const updateUserSchema = z
   .object({
     username: z.string().min(3).max(64).transform((value) => value.trim().toLowerCase()).optional(),
     displayName: z.string().trim().max(120).optional().nullable(),
-    password: z.string().min(8).max(128).optional(),
+    password: z.string().min(1).max(128).optional(),
     status: z.nativeEnum(UserStatus).optional(),
   })
   .refine((value) => Object.keys(value).length > 0, {
