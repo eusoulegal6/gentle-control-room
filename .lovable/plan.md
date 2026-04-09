@@ -1,85 +1,62 @@
 
 
-# Plan: Migrate Express Backend to Lovable Cloud Edge Functions
+# Plan: Connect Desktop App to Lovable Cloud Edge Functions
 
-## Current Situation
+## Current State
 
-Your project has a fully working Express/Prisma/SQLite backend (`server/`) that handles:
-- **Admin auth** (register, login, refresh, logout, me)
-- **Desktop user CRUD** (create, edit, delete, list)
-- **Alert management** (create, list, status updates)
-- **Desktop auth** (login, refresh, logout, me)
-- **WebSocket realtime** for desktop alert delivery
+The `Desktop.tsx` page (rendered inside the .NET WebView2 app) still calls the **old Express API** at paths like `/api/desktop/auth/login`, `/api/desktop/alerts`, etc. and uses WebSocket (`/ws/desktop-alerts`) for realtime. These endpoints no longer exist — they've been replaced by edge functions (`desktop-auth`, `desktop-alerts`).
 
-The frontend (`AdminContext.tsx`) calls these Express APIs. Lovable's preview can't run an Express server, so the app currently shows nothing useful in the live preview.
+## What Needs to Change
 
-Your Lovable Cloud database already has the right tables (`admin_profiles`, `desktop_users`, `desktop_sessions`, `alerts`) mirroring the Prisma schema.
+### 1. Update `Desktop.tsx` API calls to use Edge Functions
 
-## Migration Strategy
+Replace all `fetch()` calls from the old Express routes to the new edge function URLs:
 
-We'll replace the Express API with **Lovable Cloud edge functions** and **Supabase Auth** for admin login, while keeping the desktop user/session management as custom logic (since desktop users authenticate with username/password, not Supabase Auth).
+| Old Express route | New Edge Function call |
+|---|---|
+| `POST /api/desktop/auth/login` | `POST /functions/v1/desktop-auth/login` |
+| `POST /api/desktop/auth/refresh` | `POST /functions/v1/desktop-auth/refresh` |
+| `POST /api/desktop/auth/logout` | `POST /functions/v1/desktop-auth/logout` |
+| `GET /api/desktop/alerts` | `GET /functions/v1/desktop-alerts?userId=xxx` |
+| `POST /api/desktop/alerts/:id/delivered` | `PATCH /functions/v1/desktop-alerts/:id` with `{status:"DELIVERED"}` |
+| `POST /api/desktop/alerts/:id/read` | `PATCH /functions/v1/desktop-alerts/:id` with `{status:"READ"}` |
 
-### Step 1: Use Supabase Auth for Admin Login
+The base URL will be constructed from `VITE_SUPABASE_URL` (for web preview) or from `window.__desktopConfig.apiBaseUrl` (for the desktop app — which will need updating in `appsettings.json` later).
 
-Replace the custom admin JWT auth with Supabase Auth (email + password). The frontend will use `supabase.auth.signUp()` / `signInWithPassword()` instead of calling `/api/admin/auth/*`. The `admin_profiles` table already has RLS policies tied to `auth.uid()`.
+All requests must include the `apikey` header with the Supabase anon key.
 
-### Step 2: Create Edge Functions for Desktop User Management
+### 2. Update `src/lib/api.ts` — `getApiBaseUrl()`
 
-Create edge functions to replace Express routes:
+Add a helper that returns the edge functions base URL. For the web preview, this is `https://<project-ref>.supabase.co/functions/v1`. For the desktop app, it comes from `__desktopConfig`.
 
-- **`admin-users`** — CRUD for desktop users (list, create, update, delete). Validates the caller is an authenticated admin via Supabase JWT. Handles password hashing with bcrypt.
-- **`admin-alerts`** — Create and list alerts. Validates admin auth, checks recipient status.
-- **`desktop-auth`** — Login/refresh/logout for desktop users using username+password (custom JWT or session tokens stored in `desktop_sessions`).
-- **`desktop-alerts`** — List alerts for a desktop user, mark as delivered/read.
+### 3. Replace WebSocket Realtime with Supabase Realtime
 
-### Step 3: Update Database Schema
+Remove the WebSocket connection logic in `Desktop.tsx` and replace it with a Supabase Realtime subscription on the `alerts` table filtered by `recipient_id`. This requires:
+- Enabling realtime on the `alerts` table (already done)
+- Using the Supabase JS client with the anon key to subscribe
+- No auth session needed for realtime — the edge functions use the service role, and we can subscribe using the anon key with a channel filter
 
-Add missing columns/constraints via migrations:
-- Ensure `desktop_sessions` and `alerts` tables support the needed insert/update operations (currently RLS blocks inserts/updates — we'll need policies or use the service role in edge functions).
+### 4. Update `appsettings.json` for Desktop App
 
-### Step 4: Rewrite AdminContext to Use Supabase
-
-Replace `AdminContext.tsx` to:
-- Use `supabase.auth` for login/logout/session management
-- Call edge functions via `supabase.functions.invoke()` for user CRUD and alerts
-- Remove all direct `fetch()` calls to the Express API
-
-### Step 5: Handle Desktop Realtime
-
-Replace the WebSocket server with Supabase Realtime — enable realtime on the `alerts` table so the desktop app can subscribe to new alerts via Supabase channels.
-
-## What Changes
-
-| Component | Before | After |
-|-----------|--------|-------|
-| Admin auth | Custom JWT via Express | Supabase Auth (email/password) |
-| API calls | `fetch()` to Express | `supabase.functions.invoke()` |
-| Desktop user CRUD | Express routes | Edge function `admin-users` |
-| Alert management | Express routes | Edge function `admin-alerts` |
-| Desktop auth | Express routes + custom JWT | Edge function `desktop-auth` |
-| Realtime alerts | WebSocket server | Supabase Realtime on `alerts` table |
-| Database | SQLite via Prisma | Lovable Cloud (Postgres) |
-
-## What Stays the Same
-
-- The `.NET desktop app` code is untouched (it will just point to different API URLs)
-- The frontend UI components (Dashboard, UserManagement, SendAlert, AlertHistory) stay the same
-- The data model is unchanged
+Document that the desktop app's `appsettings.json` needs to point `Api.BaseUrl` to the Supabase project URL (e.g., `https://ipwmfdsnzjhzeofwwptk.supabase.co/functions/v1`) instead of `http://127.0.0.1:3001`. This is a manual change the user makes when building the .NET app.
 
 ## Technical Details
 
-- Edge functions will use the Supabase service role client (via `SUPABASE_SERVICE_ROLE_KEY` env var available automatically) to bypass RLS for admin operations
-- Password hashing for desktop users will use bcrypt in edge functions
-- Desktop auth will issue custom JWTs or use simple session tokens stored in `desktop_sessions`
-- We'll add RLS policies or use service role where needed for insert/update operations
+- `Desktop.tsx` will construct URLs like: `${supabaseUrl}/functions/v1/desktop-auth/login`
+- Every request includes `apikey: <anon-key>` header (required by Supabase edge functions)
+- The desktop auth flow remains custom (username/password with session tokens in `desktop_sessions`) — it does **not** use Supabase Auth
+- Realtime subscription uses `supabase.channel('desktop-alerts').on('postgres_changes', ...)` filtered by `recipient_id = <logged-in-user-id>`
+
+## Files Changed
+
+1. **`src/lib/api.ts`** — Add `getEdgeFunctionsBaseUrl()` and `getSupabaseAnonKey()` helpers
+2. **`src/pages/Desktop.tsx`** — Rewrite API calls to use edge function URLs, replace WebSocket with Supabase Realtime
+3. **`desktop/GentleControlRoom.Desktop/appsettings.json`** — Update example config (documentation)
 
 ## Build Order
 
-1. Set up Supabase Auth for admin login + update Login page
-2. Create `admin-users` edge function + wire up UserManagement
-3. Create `admin-alerts` edge function + wire up SendAlert and AlertHistory
-4. Create `desktop-auth` edge function (for the Windows app)
-5. Create `desktop-alerts` edge function (for the Windows app)
-6. Enable Supabase Realtime on alerts table
-7. Fix build errors (remove Express imports from frontend tsconfig)
+1. Update `src/lib/api.ts` with edge function URL helpers
+2. Rewrite `Desktop.tsx` API layer to call edge functions
+3. Replace WebSocket logic with Supabase Realtime subscription
+4. Test the flow in the web preview (login as desktop user, receive alerts)
 
