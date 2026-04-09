@@ -9,8 +9,15 @@ lerna-debug.log*
 
 node_modules
 dist
+dist-server
 dist-ssr
 *.local
+.env
+dev.db
+dev.db-shm
+dev.db-wal
+prisma/dev.db
+prisma/dev.db-journal
 
 # Editor directories and files
 .vscode/*

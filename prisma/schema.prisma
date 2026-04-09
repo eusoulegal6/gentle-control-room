@@ -1,0 +1,89 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+enum UserStatus {
+  ACTIVE
+  DISABLED
+}
+
+enum AlertStatus {
+  PENDING
+  DELIVERED
+  READ
+}
+
+model Admin {
+  id           String         @id @default(cuid())
+  email        String         @unique
+  passwordHash String
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  sessions     AdminSession[]
+  alertsSent   Alert[]
+}
+
+model DesktopUser {
+  id           String           @id @default(cuid())
+  username     String           @unique
+  displayName  String?
+  passwordHash String
+  status       UserStatus       @default(ACTIVE)
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  alerts       Alert[]
+  sessions     DesktopSession[]
+}
+
+model AdminSession {
+  id               String   @id @default(cuid())
+  adminId          String
+  refreshTokenHash String   @unique
+  userAgent        String?
+  ipAddress        String?
+  expiresAt        DateTime
+  revokedAt        DateTime?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  admin            Admin    @relation(fields: [adminId], references: [id], onDelete: Cascade)
+
+  @@index([adminId])
+}
+
+model DesktopSession {
+  id               String      @id @default(cuid())
+  desktopUserId    String
+  refreshTokenHash String      @unique
+  userAgent        String?
+  ipAddress        String?
+  expiresAt        DateTime
+  revokedAt        DateTime?
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+  desktopUser      DesktopUser @relation(fields: [desktopUserId], references: [id], onDelete: Cascade)
+
+  @@index([desktopUserId])
+}
+
+model Alert {
+  id                String       @id @default(cuid())
+  recipientId       String?
+  recipientUsername String
+  senderId          String
+  senderEmail       String
+  title             String?
+  message           String
+  status            AlertStatus  @default(PENDING)
+  createdAt         DateTime     @default(now())
+  deliveredAt       DateTime?
+  readAt            DateTime?
+  recipient         DesktopUser? @relation(fields: [recipientId], references: [id], onDelete: SetNull)
+  sender            Admin        @relation(fields: [senderId], references: [id], onDelete: Restrict)
+
+  @@index([recipientId, createdAt])
+  @@index([status, createdAt])
+}
