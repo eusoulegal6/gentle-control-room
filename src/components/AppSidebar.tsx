@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users, Send, History, Shield } from "lucide-react";
+import { LayoutDashboard, Users, Send, History, Shield, Monitor } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
 import {
@@ -17,6 +17,7 @@ const items = [
   { title: "User Management", url: "/dashboard/users", icon: Users },
   { title: "Send Alert", url: "/dashboard/send-alert", icon: Send },
   { title: "Alert History", url: "/dashboard/alerts", icon: History },
+  { title: "Desktop App", url: "/dashboard/desktop-app", icon: Monitor },
 ];
 
 export function AppSidebar() {
