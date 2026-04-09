@@ -127,19 +127,9 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, []);
 
   const register = useCallback(async (email: string, password: string) => {
-    const { data, error } = await supabase.auth.signUp({ email, password });
+    const { error } = await supabase.auth.signUp({ email, password });
     if (error) throw new Error(error.message);
-
-    // Create admin profile
-    if (data.user) {
-      const { error: profileError } = await supabase
-        .from("admin_profiles")
-        .insert({ id: data.user.id, email });
-
-      if (profileError) {
-        console.error("Failed to create admin profile:", profileError);
-      }
-    }
+    // Admin profile is auto-created via database trigger
   }, []);
 
   const logout = useCallback(async () => {
