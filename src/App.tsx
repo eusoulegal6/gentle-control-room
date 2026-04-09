@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AdminProvider, useAdmin } from "@/context/AdminContext";
 import { isDesktopHost } from "@/lib/api";
+import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import NotFound from "./pages/NotFound";
@@ -15,7 +16,7 @@ const queryClient = new QueryClient();
 const AuthGuard = () => {
   const { isLoggedIn, isReady } = useAdmin();
   if (!isReady) return null;
-  if (!isLoggedIn) return <Navigate to="/" replace />;
+  if (!isLoggedIn) return <Navigate to="/login" replace />;
   return <Dashboard />;
 };
 
@@ -39,7 +40,8 @@ const App = () => (
         <AdminProvider>
           <BrowserRouter>
             <Routes>
-              <Route path="/" element={<LoginGuard />} />
+              <Route path="/" element={<Index />} />
+              <Route path="/login" element={<LoginGuard />} />
               <Route path="/dashboard/*" element={<AuthGuard />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
