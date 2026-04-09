@@ -289,31 +289,3 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   return <AdminContext.Provider value={value}>{children}</AdminContext.Provider>;
 };
-        setIsReady(true);
-      }
-    };
-
-    void bootstrap();
-  }, [adminRequest, refreshAdminData, refreshSession, setAuthState]);
-
-  const value = useMemo<AdminContextType>(
-    () => ({
-      isReady,
-      isLoggedIn: Boolean(admin),
-      adminEmail: admin?.email ?? "",
-      users,
-      alerts,
-      login,
-      register,
-      logout,
-      addUser,
-      editUser,
-      deleteUser,
-      sendAlert,
-      refreshAdminData,
-    }),
-    [addUser, admin, alerts, deleteUser, editUser, isReady, login, logout, refreshAdminData, register, sendAlert, users],
-  );
-
-  return <AdminContext.Provider value={value}>{children}</AdminContext.Provider>;
-};
