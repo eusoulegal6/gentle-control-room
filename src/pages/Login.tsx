@@ -1,10 +1,11 @@
 import { useState } from "react";
+import { Shield } from "lucide-react";
+
 import { useAdmin } from "@/context/AdminContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Shield } from "lucide-react";
 
 const Login = () => {
   const { login, register } = useAdmin();
@@ -13,24 +14,34 @@ const Login = () => {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
     setError("");
 
-    if (!email || !password) {
+    if (!email.trim() || !password) {
       setError("Please fill in all fields.");
       return;
     }
 
-    if (isRegister) {
-      if (password !== confirmPassword) {
-        setError("Passwords do not match.");
-        return;
+    if (isRegister && password !== confirmPassword) {
+      setError("Passwords do not match.");
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      if (isRegister) {
+        await register(email.trim(), password);
+      } else {
+        await login(email.trim(), password);
       }
-      register(email, password);
-    } else {
-      login(email, password);
+    } catch (submitError) {
+      setError(submitError instanceof Error ? submitError.message : "Unable to complete authentication.");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -59,7 +70,7 @@ const Login = () => {
                 type="email"
                 placeholder="admin@example.com"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(event) => setEmail(event.target.value)}
               />
             </div>
             <div className="space-y-2">
@@ -67,9 +78,9 @@ const Login = () => {
               <Input
                 id="password"
                 type="password"
-                placeholder="••••••••"
+                placeholder="********"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(event) => setPassword(event.target.value)}
               />
             </div>
             {isRegister && (
@@ -78,21 +89,29 @@ const Login = () => {
                 <Input
                   id="confirm"
                   type="password"
-                  placeholder="••••••••"
+                  placeholder="********"
                   value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  onChange={(event) => setConfirmPassword(event.target.value)}
                 />
               </div>
             )}
             {error && <p className="text-sm text-destructive">{error}</p>}
-            <Button type="submit" className="w-full gradient-primary text-primary-foreground">
-              {isRegister ? "Create Account" : "Sign In"}
+            <Button
+              type="submit"
+              disabled={isSubmitting}
+              className="w-full gradient-primary text-primary-foreground"
+            >
+              {isSubmitting ? "Please wait..." : isRegister ? "Create Account" : "Sign In"}
             </Button>
           </form>
           <div className="mt-4 text-center">
             <button
               type="button"
-              onClick={() => { setIsRegister(!isRegister); setError(""); }}
+              onClick={() => {
+                setIsRegister(!isRegister);
+                setError("");
+                setConfirmPassword("");
+              }}
               className="text-sm text-muted-foreground hover:text-primary transition-colors"
             >
               {isRegister ? "Already have an account? Sign in" : "Need an account? Register"}

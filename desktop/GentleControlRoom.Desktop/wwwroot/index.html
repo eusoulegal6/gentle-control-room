@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Gentle Control Room Desktop</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-mark">G</div>
+          <div>
+            <strong>Gentle Control Room</strong>
+            <span>Desktop console</span>
+          </div>
+        </div>
+        <div class="status-card">
+          <span class="label">API</span>
+          <strong id="api-base-url">Loading...</strong>
+          <span class="hint">Configured in <code>appsettings.json</code></span>
+        </div>
+        <div class="status-card">
+          <span class="label">Session</span>
+          <strong id="session-status">Signed out</strong>
+          <span id="current-user" class="hint">No desktop user is active</span>
+        </div>
+      </aside>
+
+      <main class="content">
+        <section class="hero">
+          <div>
+            <p class="eyebrow">Windows host + WebView2</p>
+            <h1>Desktop login and alert delivery</h1>
+            <p class="subtle">
+              This local web UI is packaged with the desktop app and talks to the backend API for authentication and alerts.
+            </p>
+          </div>
+          <div class="hero-meta">
+            <span id="app-version">v0.0.0</span>
+            <span id="polling-interval">Polling every 15s</span>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h2>Desktop user sign-in</h2>
+              <p>Use the credentials created by the admin dashboard.</p>
+            </div>
+            <button id="logout-button" class="secondary" type="button">Sign out</button>
+          </div>
+
+          <form id="login-form" class="login-grid">
+            <label>
+              <span>Username</span>
+              <input id="username" name="username" autocomplete="username" required />
+            </label>
+            <label>
+              <span>Password</span>
+              <input id="password" name="password" type="password" autocomplete="current-password" required />
+            </label>
+            <button class="primary" type="submit">Sign in</button>
+          </form>
+
+          <p id="login-feedback" class="feedback"></p>
+        </section>
+
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h2>Assigned alerts</h2>
+              <p>Pending alerts are marked delivered when the desktop app receives them.</p>
+            </div>
+            <button id="refresh-alerts" class="secondary" type="button">Refresh now</button>
+          </div>
+          <div id="alert-list" class="alert-list empty">
+            <p>No alerts loaded yet.</p>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>

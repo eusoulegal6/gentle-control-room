@@ -3,6 +3,7 @@ import { Router } from "express";
 import { z } from "zod";
 
 import { asyncHandler } from "../lib/async-handler.js";
+import { publishDesktopAlertCreated } from "../lib/desktop-alerts-realtime.js";
 import { ApiError } from "../lib/errors.js";
 import { serializeAlert } from "../lib/serializers.js";
 import { prisma } from "../prisma.js";
@@ -102,5 +103,7 @@ adminAlertsRouter.post(
     res.status(201).json({
       alert: serializeAlert(alert),
     });
+
+    void publishDesktopAlertCreated(alert.id);
   }),
 );

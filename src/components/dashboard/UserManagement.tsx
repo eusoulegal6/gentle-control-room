@@ -1,4 +1,7 @@
 import { useState } from "react";
+import { Plus, Pencil, Trash2 } from "lucide-react";
+import { toast } from "sonner";
+
 import { useAdmin, AppUser } from "@/context/AdminContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,55 +9,100 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Pencil, Trash2, Eye, EyeOff } from "lucide-react";
-import { toast } from "sonner";
+import { Switch } from "@/components/ui/switch";
+
+interface UserFormState {
+  username: string;
+  password: string;
+  displayName: string;
+  status: AppUser["status"];
+}
+
+const initialFormState: UserFormState = {
+  username: "",
+  password: "",
+  displayName: "",
+  status: "ACTIVE",
+};
+
+function formatUserStatus(status: AppUser["status"]) {
+  return status === "ACTIVE" ? "Active" : "Disabled";
+}
 
 const UserManagement = () => {
   const { users, addUser, editUser, deleteUser } = useAdmin();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<AppUser | null>(null);
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
-  const [showPasswords, setShowPasswords] = useState<Record<string, boolean>>({});
+  const [form, setForm] = useState<UserFormState>(initialFormState);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const openCreate = () => {
     setEditingUser(null);
-    setUsername("");
-    setPassword("");
+    setForm(initialFormState);
     setDialogOpen(true);
   };
 
   const openEdit = (user: AppUser) => {
     setEditingUser(user);
-    setUsername(user.username);
-    setPassword(user.password);
+    setForm({
+      username: user.username,
+      password: "",
+      displayName: user.displayName ?? "",
+      status: user.status,
+    });
     setDialogOpen(true);
   };
 
-  const handleSave = () => {
-    if (!username.trim() || !password.trim()) {
-      toast.error("Username and password are required.");
+  const handleSave = async () => {
+    if (!form.username.trim()) {
+      toast.error("Username is required.");
       return;
     }
-    if (editingUser) {
-      editUser(editingUser.id, username.trim(), password.trim());
-      toast.success("User updated successfully.");
-    } else {
-      addUser(username.trim(), password.trim());
-      toast.success("User created successfully.");
+
+    if (!editingUser && !form.password.trim()) {
+      toast.error("Password is required.");
+      return;
     }
-    setDialogOpen(false);
+
+    setIsSaving(true);
+
+    try {
+      if (editingUser) {
+        await editUser(editingUser.id, {
+          username: form.username.trim(),
+          displayName: form.displayName.trim() || null,
+          status: form.status,
+          password: form.password.trim() || undefined,
+        });
+        toast.success("User updated successfully.");
+      } else {
+        await addUser(form.username.trim(), form.password.trim(), form.displayName.trim() || null);
+        toast.success("User created successfully.");
+      }
+
+      setDialogOpen(false);
+      setForm(initialFormState);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Unable to save user.");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  const handleDelete = (id: string) => {
-    deleteUser(id);
-    setDeleteConfirm(null);
-    toast.success("User deleted.");
-  };
+  const handleDelete = async (id: string) => {
+    setIsDeleting(true);
 
-  const togglePassword = (id: string) => {
-    setShowPasswords(prev => ({ ...prev, [id]: !prev[id] }));
+    try {
+      await deleteUser(id);
+      setDeleteConfirm(null);
+      toast.success("User deleted.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Unable to delete user.");
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   return (
@@ -79,8 +127,9 @@ const UserManagement = () => {
               <TableHeader>
                 <TableRow>
                   <TableHead>Username</TableHead>
-                  <TableHead>Password</TableHead>
+                  <TableHead>Display Name</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead>Alerts</TableHead>
                   <TableHead>Created</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
@@ -90,22 +139,16 @@ const UserManagement = () => {
                   <TableRow key={user.id}>
                     <TableCell className="font-medium">{user.username}</TableCell>
                     <TableCell>
-                      <div className="flex items-center gap-2">
-                        <code className="text-sm bg-muted px-2 py-0.5 rounded">
-                          {showPasswords[user.id] ? user.password : "••••••••"}
-                        </code>
-                        <button onClick={() => togglePassword(user.id)} className="text-muted-foreground hover:text-foreground">
-                          {showPasswords[user.id] ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                        </button>
-                      </div>
+                      {user.displayName || <span className="text-muted-foreground">Not set</span>}
                     </TableCell>
                     <TableCell>
-                      <span className={`text-xs font-medium px-2 py-1 rounded-full ${user.status === "active" ? "bg-success/10 text-success" : "bg-muted text-muted-foreground"}`}>
-                        {user.status}
+                      <span className={`text-xs font-medium px-2 py-1 rounded-full ${user.status === "ACTIVE" ? "bg-success/10 text-success" : "bg-muted text-muted-foreground"}`}>
+                        {formatUserStatus(user.status)}
                       </span>
                     </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">{user.alertCount}</TableCell>
                     <TableCell className="text-muted-foreground text-sm">
-                      {user.createdAt.toLocaleDateString()}
+                      {new Date(user.createdAt).toLocaleDateString()}
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
@@ -121,7 +164,7 @@ const UserManagement = () => {
                 ))}
                 {users.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                    <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
                       No users yet. Click "Add User" to create one.
                     </TableCell>
                   </TableRow>
@@ -132,7 +175,6 @@ const UserManagement = () => {
         </CardContent>
       </Card>
 
-      {/* Create/Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent>
           <DialogHeader>
@@ -141,25 +183,66 @@ const UserManagement = () => {
           <div className="space-y-4 py-2">
             <div className="space-y-2">
               <Label>Username</Label>
-              <Input placeholder="e.g. john.doe" value={username} onChange={e => setUsername(e.target.value)} />
+              <Input
+                placeholder="e.g. john.doe"
+                value={form.username}
+                onChange={(event) => setForm((current) => ({ ...current, username: event.target.value }))}
+              />
               <p className="text-xs text-muted-foreground">This will be the login username for the Windows app.</p>
             </div>
             <div className="space-y-2">
-              <Label>Password</Label>
-              <Input type="text" placeholder="Enter password" value={password} onChange={e => setPassword(e.target.value)} />
-              <p className="text-xs text-muted-foreground">This will be the login password for the Windows app.</p>
+              <Label>Display Name</Label>
+              <Input
+                placeholder="e.g. John Doe"
+                value={form.displayName}
+                onChange={(event) => setForm((current) => ({ ...current, displayName: event.target.value }))}
+              />
+              <p className="text-xs text-muted-foreground">Optional friendly name shown in admin and desktop views.</p>
+            </div>
+            <div className="space-y-2">
+              <Label>{editingUser ? "Reset Password" : "Password"}</Label>
+              <Input
+                type="password"
+                placeholder={editingUser ? "Leave blank to keep current password" : "Enter password"}
+                value={form.password}
+                onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))}
+              />
+              <p className="text-xs text-muted-foreground">
+                {editingUser
+                  ? "Only enter a value if you want to replace the current password."
+                  : "This will be the login password for the Windows app."}
+              </p>
+            </div>
+            <div className="flex items-center justify-between rounded-lg border p-3">
+              <div>
+                <Label htmlFor="user-status">Active account</Label>
+                <p className="text-xs text-muted-foreground mt-1">Disabled users cannot sign in or receive new alerts.</p>
+              </div>
+              <Switch
+                id="user-status"
+                checked={form.status === "ACTIVE"}
+                onCheckedChange={(checked) =>
+                  setForm((current) => ({
+                    ...current,
+                    status: checked ? "ACTIVE" : "DISABLED",
+                  }))
+                }
+              />
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
-            <Button onClick={handleSave} className="gradient-primary text-primary-foreground">
-              {editingUser ? "Save Changes" : "Create User"}
+            <Button
+              onClick={() => void handleSave()}
+              disabled={isSaving}
+              className="gradient-primary text-primary-foreground"
+            >
+              {isSaving ? "Saving..." : editingUser ? "Save Changes" : "Create User"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation */}
       <Dialog open={!!deleteConfirm} onOpenChange={() => setDeleteConfirm(null)}>
         <DialogContent>
           <DialogHeader>
@@ -168,7 +251,17 @@ const UserManagement = () => {
           <p className="text-sm text-muted-foreground">Are you sure you want to delete this user? They will no longer be able to log into the Windows app.</p>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDeleteConfirm(null)}>Cancel</Button>
-            <Button variant="destructive" onClick={() => deleteConfirm && handleDelete(deleteConfirm)}>Delete</Button>
+            <Button
+              variant="destructive"
+              disabled={isDeleting}
+              onClick={() => {
+                if (deleteConfirm) {
+                  void handleDelete(deleteConfirm);
+                }
+              }}
+            >
+              {isDeleting ? "Deleting..." : "Delete"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

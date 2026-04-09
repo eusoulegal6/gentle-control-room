@@ -2,10 +2,12 @@ import { createServer } from "node:http";
 
 import { config } from "./config.js";
 import { createApp } from "./app.js";
+import { createDesktopAlertsRealtimeServer } from "./lib/desktop-alerts-realtime.js";
 import { prisma } from "./prisma.js";
 
 const app = createApp();
 const server = createServer(app);
+createDesktopAlertsRealtimeServer(server);
 
 server.listen(config.PORT, () => {
   console.log(`API listening on http://localhost:${config.PORT}`);

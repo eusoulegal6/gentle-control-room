@@ -1,13 +1,14 @@
-import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
-import { AppSidebar } from "@/components/AppSidebar";
 import { Routes, Route, Navigate } from "react-router-dom";
+import { LogOut } from "lucide-react";
+
+import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { Button } from "@/components/ui/button";
+import { AppSidebar } from "@/components/AppSidebar";
 import UserManagement from "@/components/dashboard/UserManagement";
 import SendAlert from "@/components/dashboard/SendAlert";
 import AlertHistory from "@/components/dashboard/AlertHistory";
 import DashboardHome from "@/components/dashboard/DashboardHome";
 import { useAdmin } from "@/context/AdminContext";
-import { LogOut } from "lucide-react";
-import { Button } from "@/components/ui/button";
 
 const Dashboard = () => {
   const { logout, adminEmail } = useAdmin();
@@ -21,7 +22,12 @@ const Dashboard = () => {
             <SidebarTrigger className="ml-1" />
             <div className="flex items-center gap-3">
               <span className="text-sm text-muted-foreground hidden sm:inline">{adminEmail}</span>
-              <Button variant="ghost" size="sm" onClick={logout} className="text-muted-foreground hover:text-destructive">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => void logout()}
+                className="text-muted-foreground hover:text-destructive"
+              >
                 <LogOut className="w-4 h-4 mr-1" /> Logout
               </Button>
             </div>
