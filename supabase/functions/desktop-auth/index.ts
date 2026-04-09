@@ -1,11 +1,11 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.4";
+import { verifyPassword } from "../_shared/password.ts";
+import { encode as base64Encode } from "https://deno.land/std@0.224.0/encoding/base64.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
-import * as bcrypt from "https://deno.land/x/bcrypt@v0.4.1/mod.ts";
-import { encode as base64Encode } from "https://deno.land/std@0.224.0/encoding/base64.ts";
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
 const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -35,7 +35,7 @@ Deno.serve(async (req) => {
     const supabase = createClient(supabaseUrl, serviceRoleKey);
     const url = new URL(req.url);
     const pathParts = url.pathname.split("/").filter(Boolean);
-    const action = pathParts[pathParts.length - 1]; // login, refresh, logout, me
+    const action = pathParts[pathParts.length - 1];
 
     // LOGIN
     if (req.method === "POST" && action === "login") {
@@ -62,7 +62,7 @@ Deno.serve(async (req) => {
         });
       }
 
-      const valid = await bcrypt.compare(password, user.password_hash);
+      const valid = await verifyPassword(password, user.password_hash);
       if (!valid) {
         return new Response(JSON.stringify({ error: "Invalid credentials" }), {
           status: 401,
@@ -124,7 +124,6 @@ Deno.serve(async (req) => {
         });
       }
 
-      // Rotate refresh token
       const newRefreshToken = generateToken();
       await supabase
         .from("desktop_sessions")
