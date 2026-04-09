@@ -51,7 +51,7 @@ Deno.serve(async (req) => {
 
     // LOGIN
     if (req.method === "POST" && action === "login") {
-      const { username, password } = await req.json();
+      const { username, password } = body as { username?: string; password?: string };
 
       if (!username || !password) {
         return new Response(JSON.stringify({ error: "Username and password are required" }), {
@@ -111,7 +111,7 @@ Deno.serve(async (req) => {
 
     // REFRESH
     if (req.method === "POST" && action === "refresh") {
-      const { refreshToken } = await req.json();
+      const { refreshToken } = body as { refreshToken?: string };
 
       if (!refreshToken) {
         return new Response(JSON.stringify({ error: "Refresh token required" }), {
@@ -161,7 +161,7 @@ Deno.serve(async (req) => {
 
     // LOGOUT
     if (req.method === "POST" && action === "logout") {
-      const { refreshToken } = await req.json();
+      const { refreshToken } = body as { refreshToken?: string };
       if (refreshToken) {
         const tokenHash = await hashToken(refreshToken);
         await supabase
