@@ -13,7 +13,7 @@ const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 function generateToken(): string {
   const bytes = new Uint8Array(32);
   crypto.getRandomValues(bytes);
-  return base64Encode(bytes).replace(/[+/=]/g, (c) =>
+  return encodeBase64(bytes).replace(/[+/=]/g, (c) =>
     c === "+" ? "-" : c === "/" ? "_" : ""
   );
 }
