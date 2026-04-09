@@ -152,6 +152,18 @@ public partial class MainWindow : System.Windows.Window
       }
 
       var messageType = typeElement.GetString();
+      if (string.Equals(messageType, "desktop.window.hideToTray", StringComparison.Ordinal))
+      {
+        Dispatcher.Invoke(() => HideToTray(showBalloonTip: false));
+        return;
+      }
+
+      if (string.Equals(messageType, "desktop.window.show", StringComparison.Ordinal))
+      {
+        Dispatcher.Invoke(ShowFromTray);
+        return;
+      }
+
       if (!string.Equals(messageType, "desktop.alert.received", StringComparison.Ordinal))
       {
         return;

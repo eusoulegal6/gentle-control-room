@@ -51,8 +51,8 @@ public sealed class WebUiConfig
 public sealed class BehaviorConfig
 {
   public bool StartInTray { get; init; }
-  public bool MinimizeToTray { get; init; }
-  public bool CloseToTray { get; init; }
+  public bool MinimizeToTray { get; init; } = true;
+  public bool CloseToTray { get; init; } = true;
   public bool EnableDevTools { get; init; }
   public bool EnableNativeNotifications { get; init; } = true;
   public int AlertPollingSeconds { get; init; } = 15;

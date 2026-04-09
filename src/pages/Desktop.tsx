@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { BellRing, RefreshCw, Shield, User } from "lucide-react";
+
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Badge } from "@/components/ui/badge";
-import { BellRing, RefreshCw, Shield, User } from "lucide-react";
 import { buildJsonRequestInit, getApiBaseUrl, getDesktopConfig, parseApiResponse, postDesktopHostMessage } from "@/lib/api";
 
 type DesktopAlertStatus = "PENDING" | "DELIVERED" | "READ";
@@ -67,17 +68,17 @@ function getRealtimeAlertsUrl(apiBaseUrl: string, accessToken: string) {
   return url.toString();
 }
 
-const badgeVariant: Record<DesktopAlertStatus, "outline" | "default" | "secondary"> = {
-  PENDING: "outline",
-  DELIVERED: "default",
-  READ: "secondary",
-};
-
 function sortAlertsByNewest(alerts: DesktopAlert[]) {
   return [...alerts].sort(
     (left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime(),
   );
 }
+
+const badgeVariant: Record<DesktopAlertStatus, "outline" | "default" | "secondary"> = {
+  PENDING: "outline",
+  DELIVERED: "default",
+  READ: "secondary",
+};
 
 const Desktop = () => {
   const apiBaseUrl = useMemo(() => getApiBaseUrl(), []);
@@ -100,6 +101,8 @@ const Desktop = () => {
     accessToken: null,
     refreshToken: null,
   });
+
+  const latestAlert = alerts[0] ?? null;
 
   const syncAuth = (nextAuth: { accessToken: string | null; refreshToken: string | null }, nextUser: DesktopSessionUser | null) => {
     authRef.current = nextAuth;
@@ -209,6 +212,12 @@ const Desktop = () => {
     );
   };
 
+  const noteAlertNotified = (alertId: string) => {
+    const knownIds = new Set(notifiedAlertIdsRef.current);
+    knownIds.add(alertId);
+    syncNotifiedAlertIds(knownIds);
+  };
+
   const notifyNativeHost = (alert: DesktopAlert) => {
     if (!desktopConfig?.enableNativeNotifications) {
       return;
@@ -226,15 +235,20 @@ const Desktop = () => {
     });
   };
 
-  const noteAlertNotified = (alertId: string) => {
-    const knownIds = new Set(notifiedAlertIdsRef.current);
-    knownIds.add(alertId);
-    syncNotifiedAlertIds(knownIds);
+  const requestHideToTray = () => {
+    postDesktopHostMessage({
+      type: "desktop.window.hideToTray",
+    });
+  };
+
+  const requestShowDesktopWindow = () => {
+    postDesktopHostMessage({
+      type: "desktop.window.show",
+    });
   };
 
   const handleIncomingRealtimeAlert = (incomingAlert: DesktopAlert) => {
-    const alreadyNotified = notifiedAlertIdsRef.current.has(incomingAlert.id);
-    if (!alreadyNotified) {
+    if (!notifiedAlertIdsRef.current.has(incomingAlert.id)) {
       notifyNativeHost(incomingAlert);
       noteAlertNotified(incomingAlert.id);
     }
@@ -297,10 +311,10 @@ const Desktop = () => {
     setIsRefreshing(true);
     try {
       await fetchAlerts();
-      setFeedback("Alerts refreshed.");
+      setFeedback("Alerts synced.");
       setFeedbackTone("success");
     } catch (error) {
-      setFeedback(error instanceof Error ? error.message : "Unable to refresh alerts.");
+      setFeedback(error instanceof Error ? error.message : "Unable to sync alerts.");
       setFeedbackTone("error");
     } finally {
       setIsRefreshing(false);
@@ -327,11 +341,14 @@ const Desktop = () => {
         payload.user,
       );
 
-      setFeedback("Desktop session established.");
+      setFeedback("Signed in. The app will continue running in the background.");
       setFeedbackTone("success");
       setUsername("");
       setPassword("");
       await fetchAlerts();
+      window.setTimeout(() => {
+        requestHideToTray();
+      }, 400);
     } catch (error) {
       setFeedback(error instanceof Error ? error.message : "Unable to sign in.");
       setFeedbackTone("error");
@@ -369,11 +386,11 @@ const Desktop = () => {
 
   const handleMarkAsRead = async (alertId: string) => {
     try {
-      await desktopRequest<{ alert: DesktopAlert }>(
+      const payload = await desktopRequest<{ alert: DesktopAlert }>(
         `/api/desktop/alerts/${alertId}/read`,
         buildJsonRequestInit("POST", {}),
       );
-      await fetchAlerts();
+      upsertAlert(payload.alert);
     } catch (error) {
       setFeedback(error instanceof Error ? error.message : "Unable to mark alert as read.");
       setFeedbackTone("error");
@@ -510,78 +527,25 @@ const Desktop = () => {
     };
   }, [sessionUser, pollingMs]);
 
-  return (
-    <div className="min-h-screen bg-background px-4 py-6 md:px-6">
-      <div className="mx-auto grid max-w-7xl gap-6 lg:grid-cols-[280px_1fr]">
-        <aside className="rounded-3xl bg-sidebar px-6 py-8 text-sidebar-foreground shadow-elevated">
-          <div className="flex items-center gap-4">
-            <div className="flex h-16 w-16 items-center justify-center rounded-2xl gradient-primary text-2xl font-bold text-primary-foreground">
-              G
-            </div>
-            <div>
-              <h1 className="text-3xl font-semibold text-white">Gentle Control Room</h1>
-              <p className="text-base text-sidebar-foreground/80">Desktop console</p>
-            </div>
-          </div>
-
-          <Card className="mt-8 border-sidebar-border bg-sidebar-accent text-sidebar-accent-foreground shadow-card">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm uppercase tracking-[0.16em] text-sidebar-foreground/80">API</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <p className="text-2xl font-semibold text-white">{apiBaseUrl}</p>
-              <p className="text-sm text-sidebar-foreground/75">Configured in desktop host settings.</p>
-            </CardContent>
-          </Card>
-
-          <Card className="mt-6 border-sidebar-border bg-sidebar-accent text-sidebar-accent-foreground shadow-card">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm uppercase tracking-[0.16em] text-sidebar-foreground/80">Session</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <p className="text-2xl font-semibold text-white">{sessionUser ? "Signed in" : "Signed out"}</p>
-              <p className="text-sm text-sidebar-foreground/75">
-                {sessionUser
-                  ? `${sessionUser.username} (${sessionUser.status})`
-                  : "No desktop user is active"}
-              </p>
-            </CardContent>
-          </Card>
-        </aside>
-
-        <div className="space-y-6">
-          <Card className="shadow-elevated">
-            <CardHeader className="flex flex-row items-start justify-between gap-4">
+  if (!sessionUser) {
+    return (
+      <div className="min-h-screen bg-background px-4 py-6">
+        <div className="mx-auto flex min-h-[calc(100vh-3rem)] max-w-4xl items-center justify-center">
+          <Card className="w-full max-w-xl shadow-elevated">
+            <CardHeader className="space-y-4 text-center">
+              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl gradient-primary text-2xl font-bold text-primary-foreground">
+                G
+              </div>
               <div className="space-y-2">
                 <p className="text-sm uppercase tracking-[0.18em] text-primary">Windows Host + WebView2</p>
-                <CardTitle className="text-4xl">Desktop login and alert delivery</CardTitle>
-                <CardDescription className="max-w-3xl text-base">
-                  This packaged React frontend runs inside WebView2 and talks to the backend API for desktop authentication and alerts.
+                <CardTitle className="text-4xl">Desktop alert client</CardTitle>
+                <CardDescription className="mx-auto max-w-md text-base">
+                  Sign in once and the app will stay in the background to receive alerts automatically.
                 </CardDescription>
               </div>
-              <div className="text-right text-muted-foreground">
-                <p className="text-3xl font-semibold text-foreground">v{desktopConfig?.appVersion ?? "0.1.0"}</p>
-                <p className="mt-2 text-base">
-                  {isRealtimeConnected ? "Realtime connected" : `Polling every ${desktopConfig?.alertPollingSeconds ?? 15}s`}
-                </p>
-              </div>
             </CardHeader>
-          </Card>
-
-          <Card className="shadow-card">
-            <CardHeader className="flex flex-row items-start justify-between gap-4">
-              <div>
-                <CardTitle className="text-3xl">Desktop user sign-in</CardTitle>
-                <CardDescription className="mt-2 text-base">
-                  Use the credentials created by the admin dashboard.
-                </CardDescription>
-              </div>
-              <Button variant="secondary" onClick={handleLogout} disabled={!sessionUser}>
-                Sign out
-              </Button>
-            </CardHeader>
-            <CardContent>
-              <form className="grid gap-4 md:grid-cols-[1fr_1fr_auto]" onSubmit={handleLogin}>
+            <CardContent className="space-y-5">
+              <form className="grid gap-4" onSubmit={handleLogin}>
                 <div className="space-y-2">
                   <Label htmlFor="desktop-username">Username</Label>
                   <Input
@@ -601,69 +565,147 @@ const Desktop = () => {
                     autoComplete="current-password"
                   />
                 </div>
-                <Button type="submit" className="h-10 self-end gradient-primary text-primary-foreground" disabled={isLoading}>
+                <Button type="submit" className="gradient-primary text-primary-foreground" disabled={isLoading}>
                   {isLoading ? "Signing in..." : "Sign in"}
                 </Button>
               </form>
 
               {feedback && (
-                <p className={`mt-4 text-base ${feedbackTone === "error" ? "text-destructive" : "text-success"}`}>
+                <p className={`text-sm ${feedbackTone === "error" ? "text-destructive" : "text-success"}`}>
                   {feedback}
                 </p>
               )}
             </CardContent>
           </Card>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-background px-4 py-6">
+      <div className="mx-auto max-w-4xl space-y-6">
+        <Card className="shadow-elevated">
+          <CardContent className="flex flex-col gap-6 p-6 md:flex-row md:items-center md:justify-between">
+            <div className="space-y-3">
+              <p className="text-sm uppercase tracking-[0.18em] text-primary">Background Client</p>
+              <div>
+                <h1 className="text-4xl font-semibold tracking-tight">Running and ready</h1>
+                <p className="mt-2 max-w-2xl text-base text-muted-foreground">
+                  The app stays in the background and shows alerts as soon as they arrive.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Badge variant={isRealtimeConnected ? "default" : "outline"}>
+                  {isRealtimeConnected ? "Realtime connected" : "Polling fallback"}
+                </Badge>
+                <Badge variant="secondary">Tray-enabled</Badge>
+                <Badge variant="outline">v{desktopConfig?.appVersion ?? "0.1.0"}</Badge>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-3">
+              <Button onClick={requestHideToTray} className="gradient-primary text-primary-foreground">
+                Run In Background
+              </Button>
+              <Button variant="outline" onClick={handleRefreshAlerts} disabled={isRefreshing}>
+                <RefreshCw className={`mr-2 h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
+                Sync
+              </Button>
+              <Button variant="ghost" onClick={handleLogout}>
+                Sign out
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        <div className="grid gap-4 md:grid-cols-3">
+          <Card className="shadow-card">
+            <CardContent className="space-y-2 p-5">
+              <p className="text-sm font-medium text-muted-foreground">Signed in as</p>
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary">
+                  <User className="h-4 w-4" />
+                </div>
+                <div>
+                  <p className="text-lg font-semibold">{sessionUser.displayName ?? sessionUser.username}</p>
+                  <p className="text-sm text-muted-foreground">{sessionUser.username}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
           <Card className="shadow-card">
-            <CardHeader className="flex flex-row items-start justify-between gap-4">
-              <div>
-                <CardTitle className="text-3xl">Assigned alerts</CardTitle>
-                <CardDescription className="mt-2 text-base">
-                  Pending alerts are marked delivered when the desktop app receives them.
-                </CardDescription>
-              </div>
-              <Button variant="secondary" onClick={handleRefreshAlerts} disabled={!sessionUser || isRefreshing}>
-                <RefreshCw className={`mr-2 h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
-                Refresh now
-              </Button>
-            </CardHeader>
-            <CardContent>
-              {alerts.length === 0 ? (
-                <p className="text-base text-muted-foreground">No alerts available for this user.</p>
-              ) : (
-                <ScrollArea className="max-h-[420px] pr-4">
-                  <div className="space-y-4">
-                    {alerts.map((alert) => (
-                      <div key={alert.id} className="rounded-2xl border bg-card/80 p-5 shadow-card">
-                        <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
-                          <div className="space-y-3">
-                            <div className="flex items-center gap-2">
-                              <BellRing className="h-4 w-4 text-primary" />
-                              <h3 className="text-lg font-semibold">{alert.title ?? "Alert"}</h3>
-                              <Badge variant={badgeVariant[alert.status]}>{alert.status}</Badge>
-                            </div>
-                            <p className="text-base text-muted-foreground">{alert.message}</p>
-                            <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
-                              <span>Created {new Date(alert.createdAt).toLocaleString()}</span>
-                              <span>From {alert.senderEmail}</span>
-                              {alert.deliveredAt && <span>Delivered {new Date(alert.deliveredAt).toLocaleString()}</span>}
-                              {alert.readAt && <span>Read {new Date(alert.readAt).toLocaleString()}</span>}
-                            </div>
-                          </div>
-                          {alert.status !== "READ" && (
-                            <Button variant="outline" onClick={() => void handleMarkAsRead(alert.id)}>
-                              Mark read
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </ScrollArea>
-              )}
+            <CardContent className="space-y-2 p-5">
+              <p className="text-sm font-medium text-muted-foreground">Status</p>
+              <p className="text-lg font-semibold">
+                {latestAlert ? "Waiting for the next alert" : "No alerts yet"}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                {latestAlert
+                  ? `Last alert at ${new Date(latestAlert.createdAt).toLocaleTimeString()}.`
+                  : "Notifications will appear automatically while this app stays open or hidden in the tray."}
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card className="shadow-card">
+            <CardContent className="space-y-2 p-5">
+              <p className="text-sm font-medium text-muted-foreground">Background mode</p>
+              <p className="text-lg font-semibold">Always on</p>
+              <p className="text-sm text-muted-foreground">
+                Minimize or close the window and the client will keep running in the notification area.
+              </p>
             </CardContent>
           </Card>
         </div>
+
+        <Card className="shadow-card">
+          <CardHeader>
+            <CardTitle className="text-2xl">Latest alerts</CardTitle>
+            <CardDescription>
+              A compact view of the most recent messages delivered to this device.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {feedback && (
+              <p className={`mb-4 text-sm ${feedbackTone === "error" ? "text-destructive" : "text-success"}`}>
+                {feedback}
+              </p>
+            )}
+
+            {alerts.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No alerts have arrived yet.</p>
+            ) : (
+              <ScrollArea className="max-h-[320px] pr-3">
+                <div className="space-y-3">
+                  {alerts.slice(0, 5).map((alert) => (
+                    <div key={alert.id} className="rounded-2xl border bg-card/80 p-4 shadow-card">
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2">
+                            <BellRing className="h-4 w-4 text-primary" />
+                            <p className="font-medium">{alert.title ?? "Alert"}</p>
+                            <Badge variant={badgeVariant[alert.status]}>{alert.status}</Badge>
+                          </div>
+                          <p className="text-sm text-muted-foreground">{alert.message}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {new Date(alert.createdAt).toLocaleString()}
+                          </p>
+                        </div>
+                        {alert.status !== "READ" && (
+                          <Button variant="outline" size="sm" onClick={() => void handleMarkAsRead(alert.id)}>
+                            Mark read
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
