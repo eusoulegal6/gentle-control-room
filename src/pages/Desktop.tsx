@@ -504,75 +504,79 @@ const Desktop = () => {
 
   return (
     <div className="bg-background px-3 py-2">
-      <div ref={preferredWindowSizeRef} className="mx-auto max-w-2xl space-y-2.5">
-        <Card className="shadow-card">
-          <CardContent className="flex items-center justify-between px-3 py-2">
-            <Button size="sm" onClick={requestHideToTray} className="gradient-primary text-primary-foreground">
-              Run In Background
-            </Button>
-            <Button variant="ghost" size="sm" onClick={handleLogout}>
-              Sign out
-            </Button>
-          </CardContent>
-        </Card>
-
-        <Card className="shadow-card">
-          <CardContent className="flex items-center gap-3 px-3 py-2.5">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary">
-              <User className="h-3.5 w-3.5" />
-            </div>
-            <div className="leading-tight">
-              <p className="text-sm font-semibold">{sessionUser.displayName ?? sessionUser.username}</p>
-              <p className="text-xs text-muted-foreground">{sessionUser.username}</p>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="shadow-card">
-          <CardHeader className="px-3 py-2.5 pb-1.5">
-            <CardTitle className="text-base">Latest alerts</CardTitle>
-            <CardDescription className="text-xs">
-              Recent messages delivered to this device.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="px-3 pb-3 pt-0">
-            {feedback && (
-              <p className={`mb-2 text-xs ${feedbackTone === "error" ? "text-destructive" : "text-success"}`}>
-                {feedback}
-              </p>
-            )}
-
-            {alerts.length === 0 ? (
-              <p className="text-xs text-muted-foreground">No alerts have arrived yet.</p>
-            ) : (
-              <ScrollArea className="max-h-[280px] pr-2">
-                <div className="space-y-1.5">
-                  {alerts.slice(0, 5).map((alert) => (
-                    <div key={alert.id} className="rounded-lg border bg-card/80 px-3 py-2 shadow-sm">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0 space-y-0.5">
-                          <div className="flex items-center gap-1.5">
-                            <BellRing className="h-3.5 w-3.5 shrink-0 text-primary" />
-                            <p className="truncate text-sm font-medium">{alert.title ?? "Alert"}</p>
-                            <Badge variant={badgeVariant[alert.status]} className="text-[0.65rem] px-1.5 py-0">{alert.status}</Badge>
-                          </div>
-                          <p className="text-xs leading-snug text-muted-foreground">{alert.message}</p>
-                          <p className="text-[0.65rem] text-muted-foreground">
-                            {new Date(alert.createdAt).toLocaleString()}
-                          </p>
-                        </div>
-                        {alert.status !== "READ" && (
-                          <Button variant="outline" size="sm" className="h-7 text-xs shrink-0" onClick={() => void handleMarkAsRead(alert.id)}>
-                            Mark read
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  ))}
+      <div ref={preferredWindowSizeRef} className="mx-auto max-w-2xl">
+        <Card className="shadow-card overflow-hidden">
+          <div className="flex">
+            {/* Left sidebar */}
+            <div className="flex w-[180px] shrink-0 flex-col justify-between border-r px-3 py-3">
+              <div className="flex flex-col items-center gap-1.5 text-center">
+                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-primary">
+                  <User className="h-4 w-4" />
                 </div>
-              </ScrollArea>
-            )}
-          </CardContent>
+                <div className="leading-tight">
+                  <p className="text-sm font-semibold">{sessionUser.displayName ?? sessionUser.username}</p>
+                  <p className="text-xs text-muted-foreground">{sessionUser.username}</p>
+                </div>
+              </div>
+
+              <div className="mt-4 flex flex-col gap-1.5">
+                <Button size="sm" onClick={requestHideToTray} className="gradient-primary text-primary-foreground w-full text-xs">
+                  Run In Background
+                </Button>
+                <Button variant="ghost" size="sm" onClick={handleLogout} className="w-full text-xs">
+                  Sign out
+                </Button>
+              </div>
+            </div>
+
+            {/* Right content */}
+            <div className="flex-1 min-w-0">
+              <div className="px-3 py-2.5 pb-1.5">
+                <h3 className="text-base font-semibold leading-none tracking-tight">Latest alerts</h3>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Recent messages delivered to this device.
+                </p>
+              </div>
+              <div className="px-3 pb-3 pt-0">
+                {feedback && (
+                  <p className={`mb-2 text-xs ${feedbackTone === "error" ? "text-destructive" : "text-success"}`}>
+                    {feedback}
+                  </p>
+                )}
+
+                {alerts.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">No alerts have arrived yet.</p>
+                ) : (
+                  <ScrollArea className="max-h-[280px] pr-2">
+                    <div className="space-y-1.5">
+                      {alerts.slice(0, 5).map((alert) => (
+                        <div key={alert.id} className="rounded-lg border bg-card/80 px-3 py-2 shadow-sm">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0 space-y-0.5">
+                              <div className="flex items-center gap-1.5">
+                                <BellRing className="h-3.5 w-3.5 shrink-0 text-primary" />
+                                <p className="truncate text-sm font-medium">{alert.title ?? "Alert"}</p>
+                                <Badge variant={badgeVariant[alert.status]} className="text-[0.65rem] px-1.5 py-0">{alert.status}</Badge>
+                              </div>
+                              <p className="text-xs leading-snug text-muted-foreground">{alert.message}</p>
+                              <p className="text-[0.65rem] text-muted-foreground">
+                                {new Date(alert.createdAt).toLocaleString()}
+                              </p>
+                            </div>
+                            {alert.status !== "READ" && (
+                              <Button variant="outline" size="sm" className="h-7 text-xs shrink-0" onClick={() => void handleMarkAsRead(alert.id)}>
+                                Mark read
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                )}
+              </div>
+            </div>
+          </div>
         </Card>
       </div>
     </div>
