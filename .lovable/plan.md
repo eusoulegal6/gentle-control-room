@@ -1,40 +1,36 @@
 
 
-## Plan: Simplify Desktop Page Layout + Fix Build Errors
+## Plan: Sidebar + Content Split Layout (Option D)
 
-### 1. Simplify the top card (lines 506-534 of `src/pages/Desktop.tsx`)
+Restructure the signed-in desktop page into a two-column layout: a narrow left sidebar with user info and actions, and the alerts list filling the right side — all inside one card.
 
-Replace the current hero-style top card with a compact action bar containing only the two buttons:
+### Layout
 
-```
-┌─────────────────────────────────────────────────┐
-│  [Run In Background]              [Sign out]    │
-└─────────────────────────────────────────────────┘
-```
-
-Remove: "BACKGROUND CLIENT" label, "Running and ready" title, description paragraph, all badges (realtime/tray/version).
-
-### 2. Keep remaining sections unchanged
-
-- "Signed in as" card stays as-is
-- "Latest alerts" card stays as-is
-- No Sync button reintroduced
-
-### 3. Fix build errors in Edge Functions
-
-**`supabase/functions/_shared/password.ts`** (line 51): Cast `salt` to `Uint8Array` to satisfy the `BufferSource` type:
-```typescript
-{ name: "PBKDF2", salt: salt as Uint8Array, iterations, hash: "SHA-256" }
+```text
+┌────────────────┬──────────────────────────────────┐
+│ 👤 me1         │ Latest alerts                    │
+│    me           │                                  │
+│                │ 🔔 New Alert  DELIVERED  [Read]  │
+│ [Run In Bg]    │    hi · 4/10/2026, 11:22 AM     │
+│ [Sign out]     │                                  │
+└────────────────┴──────────────────────────────────┘
 ```
 
-**All four edge function catch blocks** (`admin-alerts`, `admin-users`, `desktop-alerts`, `desktop-auth`): Change `catch (err)` to `catch (err: unknown)` and use `(err instanceof Error ? err.message : "Internal server error")`.
+### Changes (single file: `src/pages/Desktop.tsx`)
 
-### Files to modify
+1. **Replace the three stacked cards** (action bar, user info, alerts) with a single `Card` containing a two-column flex layout.
 
-- `src/pages/Desktop.tsx` — simplify top card layout
-- `supabase/functions/_shared/password.ts` — fix BufferSource type error
-- `supabase/functions/admin-alerts/index.ts` — fix unknown error type
-- `supabase/functions/admin-users/index.ts` — fix unknown error type
-- `supabase/functions/desktop-alerts/index.ts` — fix unknown error type
-- `supabase/functions/desktop-auth/index.ts` — fix unknown error type
+2. **Left column** (~180px, border-right divider):
+   - User avatar icon + display name + username at the top
+   - Two buttons stacked vertically at the bottom ("Run In Background", "Sign out")
+   - Compact padding throughout
+
+3. **Right column** (flex-1):
+   - "Latest alerts" heading + description
+   - Alert list with existing scroll area and compact row styling
+   - All current alert rendering logic preserved as-is
+
+4. **Keep**: all existing logic (mark-as-read, realtime subscription, native notifications, window sizing hook ref on the outer container), compact typography, and visual style.
+
+5. **No new files** — purely a layout refactor within the returned JSX of the signed-in state (lines 505-579).
 
