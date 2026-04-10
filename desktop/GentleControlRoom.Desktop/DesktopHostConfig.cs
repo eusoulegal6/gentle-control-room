@@ -44,6 +44,7 @@ public sealed class ApiConfig
 
 public sealed class WebUiConfig
 {
+  public string? HostedUrl { get; init; }
   public string VirtualHostName { get; init; } = "app.gentle-control-room.local";
   public string StartPage { get; init; } = "index.html";
 }

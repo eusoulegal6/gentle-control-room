@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { BellRing, RefreshCw, User } from "lucide-react";
+import { BellRing, User } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -70,7 +70,6 @@ const Desktop = () => {
   const [feedback, setFeedback] = useState<string | null>(null);
   const [feedbackTone, setFeedbackTone] = useState<"error" | "success">("success");
   const [isLoading, setIsLoading] = useState(false);
-  const [isRefreshing, setIsRefreshing] = useState(false);
   const [isRealtimeConnected, setIsRealtimeConnected] = useState(false);
   const [alerts, setAlerts] = useState<DesktopAlert[]>([]);
   const [sessionUser, setSessionUser] = useState<DesktopSessionUser | null>(null);
@@ -79,8 +78,6 @@ const Desktop = () => {
     accessToken: null,
     refreshToken: null,
   });
-
-  const latestAlert = alerts[0] ?? null;
 
   // --- Edge function request helpers ---
 
@@ -283,20 +280,6 @@ const Desktop = () => {
     syncNotifiedAlertIds(knownIds);
 
     setAlerts(sortAlertsByNewest(latestPayload.alerts));
-  };
-
-  const handleRefreshAlerts = async () => {
-    setIsRefreshing(true);
-    try {
-      await fetchAlerts();
-      setFeedback("Alerts synced.");
-      setFeedbackTone("success");
-    } catch (error) {
-      setFeedback(error instanceof Error ? error.message : "Unable to sync alerts.");
-      setFeedbackTone("error");
-    } finally {
-      setIsRefreshing(false);
-    }
   };
 
   const handleLogin = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -543,10 +526,6 @@ const Desktop = () => {
               <Button onClick={requestHideToTray} className="gradient-primary text-primary-foreground">
                 Run In Background
               </Button>
-              <Button variant="outline" onClick={handleRefreshAlerts} disabled={isRefreshing}>
-                <RefreshCw className={`mr-2 h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
-                Sync
-              </Button>
               <Button variant="ghost" onClick={handleLogout}>
                 Sign out
               </Button>
@@ -554,7 +533,7 @@ const Desktop = () => {
           </CardContent>
         </Card>
 
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-1">
           <Card className="shadow-card">
             <CardContent className="space-y-2 p-5">
               <p className="text-sm font-medium text-muted-foreground">Signed in as</p>
@@ -567,30 +546,6 @@ const Desktop = () => {
                   <p className="text-sm text-muted-foreground">{sessionUser.username}</p>
                 </div>
               </div>
-            </CardContent>
-          </Card>
-
-          <Card className="shadow-card">
-            <CardContent className="space-y-2 p-5">
-              <p className="text-sm font-medium text-muted-foreground">Status</p>
-              <p className="text-lg font-semibold">
-                {latestAlert ? "Waiting for the next alert" : "No alerts yet"}
-              </p>
-              <p className="text-sm text-muted-foreground">
-                {latestAlert
-                  ? `Last alert at ${new Date(latestAlert.createdAt).toLocaleTimeString()}.`
-                  : "Notifications will appear automatically while this app stays open or hidden in the tray."}
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card className="shadow-card">
-            <CardContent className="space-y-2 p-5">
-              <p className="text-sm font-medium text-muted-foreground">Background mode</p>
-              <p className="text-lg font-semibold">Always on</p>
-              <p className="text-sm text-muted-foreground">
-                Minimize or close the window and the client will keep running in the notification area.
-              </p>
             </CardContent>
           </Card>
         </div>

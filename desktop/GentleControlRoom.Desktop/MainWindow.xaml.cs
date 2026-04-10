@@ -1,4 +1,6 @@
+using CommunityToolkit.WinUI.Notifications;
 using System;
+using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Text.Encodings.Web;
@@ -10,9 +12,11 @@ namespace GentleControlRoom.Desktop;
 
 public partial class MainWindow : System.Windows.Window
 {
+  private const string ToastLaunchArgument = "action=open-app";
   private readonly DesktopHostConfig _config;
   private readonly bool _startInBackground;
   private readonly NotifyIcon _notifyIcon;
+  private readonly string _diagnosticLogPath;
   private bool _initialized;
   private bool _exitRequested;
 
@@ -31,7 +35,14 @@ public partial class MainWindow : System.Windows.Window
 
     _startInBackground = startInBackground;
     _config = DesktopHostConfig.Load(AppContext.BaseDirectory);
+    _diagnosticLogPath = Path.Combine(
+      Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+      "GentleControlRoom",
+      "logs",
+      "desktop-host.log");
     _notifyIcon = CreateNotifyIcon();
+    RegisterToastActivationHandler();
+    LogDiagnostic("Desktop host initialized.");
   }
 
   private async void Window_Loaded(object sender, System.Windows.RoutedEventArgs e)
@@ -41,6 +52,7 @@ public partial class MainWindow : System.Windows.Window
       await InitializeWebViewAsync();
       _initialized = true;
       LoadingOverlay.Visibility = System.Windows.Visibility.Collapsed;
+      LogDiagnostic("WebView initialized successfully.");
 
       if (ShouldUseTrayBehavior)
       {
@@ -49,6 +61,7 @@ public partial class MainWindow : System.Windows.Window
     }
     catch (Exception ex)
     {
+      LogDiagnostic($"Startup failed: {ex}");
       StatusText.Text = ex.Message;
       System.Windows.MessageBox.Show(
         this,
@@ -68,12 +81,6 @@ public partial class MainWindow : System.Windows.Window
     if (string.IsNullOrWhiteSpace(CoreWebView2Environment.GetAvailableBrowserVersionString()))
     {
       throw new InvalidOperationException("Microsoft Edge WebView2 Runtime is not installed.");
-    }
-
-    var webRoot = Path.Combine(AppContext.BaseDirectory, "wwwroot");
-    if (!Directory.Exists(webRoot))
-    {
-      throw new DirectoryNotFoundException($"Desktop web UI assets were not found: {webRoot}");
     }
 
     var userDataFolder = Path.Combine(
@@ -100,11 +107,6 @@ public partial class MainWindow : System.Windows.Window
       }
     };
 
-    AppWebView.CoreWebView2.SetVirtualHostNameToFolderMapping(
-      _config.WebUi.VirtualHostName,
-      webRoot,
-      CoreWebView2HostResourceAccessKind.Allow);
-
     var scriptConfig = JsonSerializer.Serialize(
       _config.ToScriptConfig(),
       new JsonSerializerOptions
@@ -117,6 +119,29 @@ public partial class MainWindow : System.Windows.Window
 
     StatusText.Text = "Loading desktop experience...";
 
+    var hostedUrl = _config.WebUi.HostedUrl?.Trim();
+    if (!string.IsNullOrWhiteSpace(hostedUrl))
+    {
+      if (!Uri.TryCreate(hostedUrl, UriKind.Absolute, out var hostedUri))
+      {
+        throw new InvalidOperationException($"Hosted desktop URL is invalid: {hostedUrl}");
+      }
+
+      AppWebView.Source = hostedUri;
+      return;
+    }
+
+    var webRoot = Path.Combine(AppContext.BaseDirectory, "wwwroot");
+    if (!Directory.Exists(webRoot))
+    {
+      throw new DirectoryNotFoundException($"Desktop web UI assets were not found: {webRoot}");
+    }
+
+    AppWebView.CoreWebView2.SetVirtualHostNameToFolderMapping(
+      _config.WebUi.VirtualHostName,
+      webRoot,
+      CoreWebView2HostResourceAccessKind.Allow);
+
     AppWebView.Source = new Uri($"https://{_config.WebUi.VirtualHostName}/{_config.WebUi.StartPage.TrimStart('/')}");
   }
 
@@ -126,11 +151,25 @@ public partial class MainWindow : System.Windows.Window
     menu.Items.Add("Open", null, (_, _) => Dispatcher.Invoke(ShowFromTray));
     menu.Items.Add("Exit", null, (_, _) => Dispatcher.Invoke(ExitApplication));
 
+    System.Drawing.Icon? appIcon = null;
+    try
+    {
+      var processPath = Process.GetCurrentProcess().MainModule?.FileName;
+      if (!string.IsNullOrWhiteSpace(processPath))
+      {
+        appIcon = System.Drawing.Icon.ExtractAssociatedIcon(processPath);
+      }
+    }
+    catch
+    {
+      // Fall back to the system shield icon if the packaged app icon can't be loaded.
+    }
+
     var icon = new NotifyIcon
     {
       Text = "Gentle Control Room",
       Visible = true,
-      Icon = SystemIcons.Shield,
+      Icon = appIcon ?? SystemIcons.Shield,
       ContextMenuStrip = menu,
     };
 
@@ -143,6 +182,7 @@ public partial class MainWindow : System.Windows.Window
   {
     try
     {
+      LogDiagnostic($"Received WebView message: {args.WebMessageAsJson}");
       using var document = JsonDocument.Parse(args.WebMessageAsJson);
       var root = document.RootElement;
 
@@ -184,9 +224,9 @@ public partial class MainWindow : System.Windows.Window
 
       ShowAlertNotification(title, message);
     }
-    catch
+    catch (Exception ex)
     {
-      // Ignore malformed messages from the embedded web UI.
+      LogDiagnostic($"Malformed WebView message: {ex}");
     }
   }
 
@@ -210,6 +250,21 @@ public partial class MainWindow : System.Windows.Window
     if (notificationBody.Length > 255)
     {
       notificationBody = notificationBody[..252] + "...";
+    }
+
+    try
+    {
+      LogDiagnostic($"Showing toast notification: {notificationTitle}");
+      new ToastContentBuilder()
+        .AddArgument("launch", ToastLaunchArgument)
+        .AddText(notificationTitle)
+        .AddText(notificationBody)
+        .Show();
+      return;
+    }
+    catch (Exception ex)
+    {
+      LogDiagnostic($"Toast notification failed. Falling back to tray balloon. {ex}");
     }
 
     _notifyIcon.ShowBalloonTip(
@@ -264,10 +319,48 @@ public partial class MainWindow : System.Windows.Window
 
   private void ExitApplication()
   {
+    LogDiagnostic("Desktop host shutting down.");
     _exitRequested = true;
     _notifyIcon.Visible = false;
     _notifyIcon.Dispose();
     Close();
     System.Windows.Application.Current.Shutdown();
+  }
+
+  private void RegisterToastActivationHandler()
+  {
+    try
+    {
+      ToastNotificationManagerCompat.OnActivated += (_) =>
+      {
+        LogDiagnostic("Toast activated by user.");
+        Dispatcher.Invoke(ShowFromTray);
+      };
+      LogDiagnostic("Toast activation handler registered.");
+    }
+    catch (Exception ex)
+    {
+      LogDiagnostic($"Failed to register toast activation handler: {ex}");
+    }
+  }
+
+  private void LogDiagnostic(string message)
+  {
+    try
+    {
+      var logDirectory = Path.GetDirectoryName(_diagnosticLogPath);
+      if (!string.IsNullOrWhiteSpace(logDirectory))
+      {
+        Directory.CreateDirectory(logDirectory);
+      }
+
+      File.AppendAllText(
+        _diagnosticLogPath,
+        $"[{DateTimeOffset.Now:yyyy-MM-dd HH:mm:ss.fff zzz}] {message}{Environment.NewLine}");
+    }
+    catch
+    {
+      // Avoid crashing because of diagnostics.
+    }
   }
 }
