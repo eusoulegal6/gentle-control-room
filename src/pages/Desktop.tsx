@@ -1,14 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { BellRing, User } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { buildJsonRequestInit, getDesktopConfig, getEdgeFunctionsBaseUrl, getSupabaseAnonKey, parseApiResponse, postDesktopHostMessage } from "@/lib/api";
+import { useDesktopPreferredWindowSize } from "@/hooks/use-desktop-preferred-window-size";
 import { supabase } from "@/integrations/supabase/client";
+import { buildJsonRequestInit, getDesktopConfig, getEdgeFunctionsBaseUrl, getSupabaseAnonKey, parseApiResponse, postDesktopHostMessage } from "@/lib/api";
 
 type DesktopAlertStatus = "PENDING" | "DELIVERED" | "READ";
 
@@ -78,6 +79,7 @@ const Desktop = () => {
     accessToken: null,
     refreshToken: null,
   });
+  const preferredWindowSizeRef = useDesktopPreferredWindowSize(Boolean(sessionUser));
 
   // --- Edge function request helpers ---
 
@@ -501,8 +503,8 @@ const Desktop = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background px-3 py-2">
-      <div className="mx-auto max-w-2xl space-y-2.5">
+    <div className="bg-background px-3 py-2">
+      <div ref={preferredWindowSizeRef} className="mx-auto max-w-2xl space-y-2.5">
         <Card className="shadow-card">
           <CardContent className="flex items-center justify-between px-3 py-2">
             <Button size="sm" onClick={requestHideToTray} className="gradient-primary text-primary-foreground">

@@ -192,6 +192,26 @@ public partial class MainWindow : System.Windows.Window
       }
 
       var messageType = typeElement.GetString();
+      if (string.Equals(messageType, "desktop.window.setPreferredSize", StringComparison.Ordinal))
+      {
+        if (!root.TryGetProperty("payload", out var sizePayload))
+        {
+          return;
+        }
+
+        double? contentWidth = TryReadDouble(sizePayload, "contentWidth", out var nextWidth) ? nextWidth : null;
+        double? contentHeight = TryReadDouble(sizePayload, "contentHeight", out var nextHeight) ? nextHeight : null;
+
+        Dispatcher.Invoke(() => ApplyPreferredWindowSize(contentWidth, contentHeight));
+        return;
+      }
+
+      if (string.Equals(messageType, "desktop.window.resetSize", StringComparison.Ordinal))
+      {
+        Dispatcher.Invoke(ResetPreferredWindowSize);
+        return;
+      }
+
       if (string.Equals(messageType, "desktop.window.hideToTray", StringComparison.Ordinal))
       {
         Dispatcher.Invoke(() => HideToTray(showBalloonTip: false));
