@@ -338,16 +338,16 @@ const Desktop = () => {
     }
   };
 
-  const handleMarkAsRead = async (alertId: string) => {
+  const handleAcknowledge = async (alertId: string) => {
     try {
       const payload = await desktopAlertRequest<{ alert: DesktopAlert }>(
         "PATCH",
         `/desktop-alerts/${alertId}`,
-        { status: "READ" },
+        { status: "ACKNOWLEDGED" },
       );
       upsertAlert(payload.alert);
     } catch (error) {
-      setFeedback(error instanceof Error ? error.message : "Unable to mark alert as read.");
+      setFeedback(error instanceof Error ? error.message : "Unable to acknowledge alert.");
       setFeedbackTone("error");
     }
   };
