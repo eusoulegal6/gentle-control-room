@@ -271,7 +271,7 @@ const SendAlert = () => {
                         ))}
                       </div>
                     )}
-                  </ScrollArea>
+                  
                 </div>
               )}
             </div>
