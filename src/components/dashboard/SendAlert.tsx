@@ -248,7 +248,7 @@ const SendAlert = () => {
                           >
                             <FolderOpen className="w-3.5 h-3.5 text-muted-foreground" />
                             <span>{s.label}</span>
-                            <Badge variant="secondary" className="ml-auto text-xs px-1.5 py-0">{s.count}</Badge>
+                            <Badge variant="secondary" className="ml-auto text-xs px-1.5 py-0">{s.type === "group" ? s.count : ""}</Badge>
                           </button>
                         ))}
                       </div>
@@ -267,7 +267,7 @@ const SendAlert = () => {
                           >
                             <User className="w-3.5 h-3.5 text-muted-foreground" />
                             <span>{s.label}</span>
-                            {s.sub && <span className="text-muted-foreground text-xs">({s.sub})</span>}
+                            {s.type === "user" && s.sub && <span className="text-muted-foreground text-xs">({s.sub})</span>}
                           </button>
                         ))}
                       </div>
