@@ -158,6 +158,12 @@ function renderAlerts(alerts) {
   elements.alertList.className = "alert-list";
   elements.alertList.innerHTML = alerts.map((alert) => {
     const title = alert.title || "Alert";
+    let actionHtml = "";
+    if (alert.status === "DELIVERED") {
+      actionHtml = `<button class="secondary" type="button" data-action="acknowledge" data-id="${alert.id}" disabled>Confirm (5s)</button>`;
+    } else if (alert.status === "ACKNOWLEDGED") {
+      actionHtml = `<span class="pill acknowledged">✓ Confirmed</span>`;
+    }
     return `
       <article class="alert-card">
         <header>
@@ -171,17 +177,32 @@ function renderAlerts(alerts) {
           <span>Created ${new Date(alert.createdAt).toLocaleString()}</span>
           <span>From ${escapeHtml(alert.senderEmail)}</span>
           ${alert.deliveredAt ? `<span>Delivered ${new Date(alert.deliveredAt).toLocaleString()}</span>` : ""}
-          ${alert.readAt ? `<span>Read ${new Date(alert.readAt).toLocaleString()}</span>` : ""}
+          ${alert.acknowledgedAt ? `<span>Acknowledged ${new Date(alert.acknowledgedAt).toLocaleString()}</span>` : ""}
         </div>
         <div class="actions">
-          ${alert.status !== "READ" ? `<button class="secondary" type="button" data-action="read" data-id="${alert.id}">Mark read</button>` : ""}
+          ${actionHtml}
         </div>
       </article>`;
   }).join("");
 
-  elements.alertList.querySelectorAll("[data-action='read']").forEach((button) => {
+  // Start countdowns for acknowledge buttons
+  elements.alertList.querySelectorAll("[data-action='acknowledge']").forEach((button) => {
+    let remaining = 5;
+    const interval = setInterval(() => {
+      remaining--;
+      if (remaining <= 0) {
+        clearInterval(interval);
+        button.disabled = false;
+        button.textContent = "Confirm";
+      } else {
+        button.textContent = `Confirm (${remaining}s)`;
+      }
+    }, 1000);
+
     button.addEventListener("click", async () => {
-      await markAlertRead(button.dataset.id);
+      button.disabled = true;
+      button.textContent = "...";
+      await acknowledgeAlert(button.dataset.id);
     });
   });
 }
@@ -212,8 +233,8 @@ async function fetchAlerts() {
   renderAlerts(latestPayload.alerts ?? []);
 }
 
-async function markAlertRead(alertId) {
-  await apiRequest(`/api/desktop/alerts/${alertId}/read`, { method: "POST", body: "{}" });
+async function acknowledgeAlert(alertId) {
+  await apiRequest(`/api/desktop/alerts/${alertId}/acknowledge`, { method: "POST", body: "{}" });
   await fetchAlerts();
 }
 

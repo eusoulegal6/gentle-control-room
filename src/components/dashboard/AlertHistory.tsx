@@ -7,6 +7,7 @@ const statusVariant: Record<string, "default" | "secondary" | "destructive" | "o
   PENDING: "outline",
   DELIVERED: "default",
   READ: "secondary",
+  ACKNOWLEDGED: "default",
 };
 
 function formatStatus(status: string) {
@@ -36,6 +37,7 @@ const AlertHistory = () => {
                   <TableHead>Message</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Sent At</TableHead>
+                  <TableHead>Acknowledged</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -60,11 +62,18 @@ const AlertHistory = () => {
                     <TableCell className="text-muted-foreground text-sm whitespace-nowrap">
                       {new Date(alert.createdAt).toLocaleString()}
                     </TableCell>
+                    <TableCell className="text-sm whitespace-nowrap">
+                      {alert.acknowledgedAt ? (
+                        <span className="text-green-600 font-medium">{new Date(alert.acknowledgedAt).toLocaleString()}</span>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
                   </TableRow>
                 ))}
                 {alerts.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
+                    <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
                       No alerts sent yet.
                     </TableCell>
                   </TableRow>

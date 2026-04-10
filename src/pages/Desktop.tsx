@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { BellRing, User } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { BellRing, Check, User } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,7 @@ import { useDesktopPreferredWindowSize } from "@/hooks/use-desktop-preferred-win
 import { supabase } from "@/integrations/supabase/client";
 import { buildJsonRequestInit, getDesktopConfig, getEdgeFunctionsBaseUrl, getSupabaseAnonKey, parseApiResponse, postDesktopHostMessage } from "@/lib/api";
 
-type DesktopAlertStatus = "PENDING" | "DELIVERED" | "READ";
+type DesktopAlertStatus = "PENDING" | "DELIVERED" | "READ" | "ACKNOWLEDGED";
 
 interface DesktopSessionUser {
   id: string;
@@ -29,6 +29,7 @@ interface DesktopAlert {
   createdAt: string;
   deliveredAt: string | null;
   readAt: string | null;
+  acknowledgedAt: string | null;
 }
 
 interface DesktopAuthResponse {
@@ -59,6 +60,41 @@ const badgeVariant: Record<DesktopAlertStatus, "outline" | "default" | "secondar
   PENDING: "outline",
   DELIVERED: "default",
   READ: "secondary",
+  ACKNOWLEDGED: "secondary",
+};
+
+const CONFIRM_DELAY_SECONDS = 5;
+
+const ConfirmCountdownButton = ({ alertId, onConfirm }: { alertId: string; onConfirm: (id: string) => Promise<void> }) => {
+  const [countdown, setCountdown] = useState(CONFIRM_DELAY_SECONDS);
+  const [isConfirming, setIsConfirming] = useState(false);
+
+  useEffect(() => {
+    if (countdown <= 0) return;
+    const timer = setTimeout(() => setCountdown((c) => c - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [countdown]);
+
+  const handleClick = async () => {
+    setIsConfirming(true);
+    try {
+      await onConfirm(alertId);
+    } finally {
+      setIsConfirming(false);
+    }
+  };
+
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      className="h-7 text-xs shrink-0"
+      disabled={countdown > 0 || isConfirming}
+      onClick={() => void handleClick()}
+    >
+      {isConfirming ? "..." : countdown > 0 ? `Confirm (${countdown}s)` : "Confirm"}
+    </Button>
+  );
 };
 
 const Desktop = () => {
@@ -231,6 +267,7 @@ const Desktop = () => {
       createdAt: row.created_at as string,
       deliveredAt: (row.delivered_at as string) ?? null,
       readAt: (row.read_at as string) ?? null,
+      acknowledgedAt: (row.acknowledged_at as string) ?? null,
     };
 
     if (!notifiedAlertIdsRef.current.has(incomingAlert.id)) {
@@ -335,16 +372,16 @@ const Desktop = () => {
     }
   };
 
-  const handleMarkAsRead = async (alertId: string) => {
+  const handleAcknowledge = async (alertId: string) => {
     try {
       const payload = await desktopAlertRequest<{ alert: DesktopAlert }>(
         "PATCH",
         `/desktop-alerts/${alertId}`,
-        { status: "READ" },
+        { status: "ACKNOWLEDGED" },
       );
       upsertAlert(payload.alert);
     } catch (error) {
-      setFeedback(error instanceof Error ? error.message : "Unable to mark alert as read.");
+      setFeedback(error instanceof Error ? error.message : "Unable to acknowledge alert.");
       setFeedbackTone("error");
     }
   };
@@ -426,6 +463,7 @@ const Desktop = () => {
             createdAt: row.created_at as string,
             deliveredAt: (row.delivered_at as string) ?? null,
             readAt: (row.read_at as string) ?? null,
+            acknowledgedAt: (row.acknowledged_at as string) ?? null,
           });
         },
       )
@@ -571,10 +609,13 @@ const Desktop = () => {
                                 {new Date(alert.createdAt).toLocaleString()}
                               </p>
                             </div>
-                            {alert.status !== "READ" && (
-                              <Button variant="outline" size="sm" className="h-7 text-xs shrink-0" onClick={() => void handleMarkAsRead(alert.id)}>
-                                Mark read
-                              </Button>
+                            {alert.status === "DELIVERED" && (
+                              <ConfirmCountdownButton alertId={alert.id} onConfirm={handleAcknowledge} />
+                            )}
+                            {alert.status === "ACKNOWLEDGED" && (
+                              <Badge variant="secondary" className="text-[0.65rem] px-1.5 py-0 bg-green-100 text-green-700">
+                                <Check className="h-3 w-3 mr-0.5" /> Confirmed
+                              </Badge>
                             )}
                           </div>
                         </div>

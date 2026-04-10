@@ -19,10 +19,11 @@ export interface Alert {
   senderEmail: string;
   title: string | null;
   message: string;
-  status: "PENDING" | "DELIVERED" | "READ";
+  status: "PENDING" | "DELIVERED" | "READ" | "ACKNOWLEDGED";
   createdAt: string;
   deliveredAt: string | null;
   readAt: string | null;
+  acknowledgedAt: string | null;
 }
 
 interface AdminContextType {
