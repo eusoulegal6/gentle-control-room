@@ -183,6 +183,74 @@ export type Database = {
           },
         ]
       }
+      user_group_members: {
+        Row: {
+          added_at: string
+          desktop_user_id: string
+          group_id: string
+        }
+        Insert: {
+          added_at?: string
+          desktop_user_id: string
+          group_id: string
+        }
+        Update: {
+          added_at?: string
+          desktop_user_id?: string
+          group_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_group_members_desktop_user_id_fkey"
+            columns: ["desktop_user_id"]
+            isOneToOne: false
+            referencedRelation: "desktop_users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_group_members_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "user_groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_groups: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_groups_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "admin_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
