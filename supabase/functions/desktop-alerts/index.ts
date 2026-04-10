@@ -45,6 +45,7 @@ Deno.serve(async (req) => {
         createdAt: a.created_at,
         deliveredAt: a.delivered_at,
         readAt: a.read_at,
+        acknowledgedAt: a.acknowledged_at ?? null,
       }));
 
       return new Response(JSON.stringify({ alerts: serialized }), {
@@ -64,6 +65,9 @@ Deno.serve(async (req) => {
       } else if (body.status === "READ") {
         updates.status = "READ";
         updates.read_at = new Date().toISOString();
+      } else if (body.status === "ACKNOWLEDGED") {
+        updates.status = "ACKNOWLEDGED";
+        updates.acknowledged_at = new Date().toISOString();
       }
 
       if (Object.keys(updates).length === 0) {
@@ -92,6 +96,7 @@ Deno.serve(async (req) => {
             createdAt: alert.created_at,
             deliveredAt: alert.delivered_at,
             readAt: alert.read_at,
+            acknowledgedAt: alert.acknowledged_at ?? null,
           },
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },

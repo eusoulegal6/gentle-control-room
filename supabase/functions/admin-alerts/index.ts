@@ -32,6 +32,7 @@ function serializeAlert(a: Record<string, unknown>, senderEmail = "") {
     createdAt: a.created_at,
     deliveredAt: a.delivered_at,
     readAt: a.read_at,
+    acknowledgedAt: a.acknowledged_at ?? null,
   };
 }
 
