@@ -19,6 +19,22 @@ async function getAdminId(req: Request): Promise<string | null> {
   return user?.id ?? null;
 }
 
+function serializeAlert(a: Record<string, unknown>, senderEmail = "") {
+  return {
+    id: a.id,
+    recipientId: a.recipient_id,
+    recipientUsername: a.recipient_username,
+    senderId: a.created_by,
+    senderEmail,
+    title: a.title,
+    message: a.message,
+    status: a.status,
+    createdAt: a.created_at,
+    deliveredAt: a.delivered_at,
+    readAt: a.read_at,
+  };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -58,89 +74,75 @@ Deno.serve(async (req) => {
 
       if (error) throw error;
 
-      const serialized = (alerts || []).map((a) => ({
-        id: a.id,
-        recipientId: a.recipient_id,
-        recipientUsername: a.recipient_username,
-        senderId: a.created_by,
-        senderEmail: "",
-        title: a.title,
-        message: a.message,
-        status: a.status,
-        createdAt: a.created_at,
-        deliveredAt: a.delivered_at,
-        readAt: a.read_at,
-      }));
+      const serialized = (alerts || []).map((a) => serializeAlert(a));
 
       return new Response(JSON.stringify({ alerts: serialized }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // CREATE alert
+    // CREATE alert(s) — supports single recipientId or array recipientIds
     if (req.method === "POST") {
       const body = await req.json();
-      const { recipientId, message, title } = body;
+      const { recipientId, recipientIds, message, title } = body;
 
-      if (!recipientId || !message) {
-        return new Response(JSON.stringify({ error: "recipientId and message are required" }), {
+      // Normalize to array
+      let ids: string[] = [];
+      if (Array.isArray(recipientIds) && recipientIds.length > 0) {
+        ids = recipientIds;
+      } else if (recipientId) {
+        ids = [recipientId];
+      }
+
+      if (ids.length === 0 || !message) {
+        return new Response(JSON.stringify({ error: "recipientId(s) and message are required" }), {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
-      // Verify recipient exists and is active
-      const { data: recipient } = await supabase
+      // Fetch all recipients in one query
+      const { data: recipients } = await supabase
         .from("desktop_users")
         .select("id, username, status")
-        .eq("id", recipientId)
-        .single();
+        .in("id", ids);
 
-      if (!recipient) {
-        return new Response(JSON.stringify({ error: "Recipient not found" }), {
+      if (!recipients || recipients.length === 0) {
+        return new Response(JSON.stringify({ error: "No valid recipients found" }), {
           status: 404,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
-      if (recipient.status !== "ACTIVE") {
-        return new Response(JSON.stringify({ error: "Recipient is not active" }), {
+      const activeRecipients = recipients.filter((r) => r.status === "ACTIVE");
+      if (activeRecipients.length === 0) {
+        return new Response(JSON.stringify({ error: "No active recipients found" }), {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
-      const { data: alert, error } = await supabase
+      // Bulk insert
+      const rows = activeRecipients.map((r) => ({
+        recipient_id: r.id,
+        recipient_username: r.username,
+        message,
+        title: title || "New Alert",
+        created_by: adminId,
+        status: "PENDING",
+      }));
+
+      const { data: alerts, error } = await supabase
         .from("alerts")
-        .insert({
-          recipient_id: recipientId,
-          recipient_username: recipient.username,
-          message,
-          title: title || "New Alert",
-          created_by: adminId,
-          status: "PENDING",
-        })
-        .select("*")
-        .single();
+        .insert(rows)
+        .select("*");
 
       if (error) throw error;
 
+      const serialized = (alerts || []).map((a) => serializeAlert(a, adminProfile.email));
+
       return new Response(
-        JSON.stringify({
-          alert: {
-            id: alert.id,
-            recipientId: alert.recipient_id,
-            recipientUsername: alert.recipient_username,
-            senderId: alert.created_by,
-            senderEmail: adminProfile.email,
-            title: alert.title,
-            message: alert.message,
-            status: alert.status,
-            createdAt: alert.created_at,
-            deliveredAt: alert.delivered_at,
-            readAt: alert.read_at,
-          },
-        }),
+        JSON.stringify({ alerts: serialized }),
         { status: 201, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }

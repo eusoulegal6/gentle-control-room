@@ -37,7 +37,7 @@ interface AdminContextType {
   addUser: (username: string, password: string, displayName?: string | null) => Promise<void>;
   editUser: (id: string, input: { username?: string; password?: string; displayName?: string | null; status?: AppUser["status"] }) => Promise<void>;
   deleteUser: (id: string) => Promise<void>;
-  sendAlert: (userId: string, message: string, title?: string | null) => Promise<void>;
+  sendAlert: (userIds: string | string[], message: string, title?: string | null) => Promise<void>;
   refreshAdminData: () => Promise<void>;
 }
 
@@ -160,12 +160,13 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setAlerts((prev) => prev.filter((alert) => alert.recipientId !== id));
   }, []);
 
-  const sendAlert = useCallback(async (userId: string, message: string, title?: string | null) => {
-    const payload = await invokeEdgeFunction<{ alert: Alert }>("admin-alerts", {
+  const sendAlert = useCallback(async (userIds: string | string[], message: string, title?: string | null) => {
+    const ids = Array.isArray(userIds) ? userIds : [userIds];
+    const payload = await invokeEdgeFunction<{ alerts: Alert[] }>("admin-alerts", {
       method: "POST",
-      body: { recipientId: userId, message, title: title ?? null },
+      body: { recipientIds: ids, message, title: title ?? null },
     });
-    setAlerts((prev) => [payload.alert, ...prev]);
+    setAlerts((prev) => [...payload.alerts, ...prev]);
   }, []);
 
   useEffect(() => {
