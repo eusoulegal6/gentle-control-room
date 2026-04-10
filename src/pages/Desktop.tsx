@@ -395,7 +395,7 @@ const Desktop = () => {
     }
 
     const channel = supabase
-      .channel(`desktop-alerts-${sessionUser.id}`)
+      .channel("desktop-presence")
       .on(
         "postgres_changes",
         {
@@ -429,8 +429,16 @@ const Desktop = () => {
           });
         },
       )
-      .subscribe((status) => {
+      .subscribe(async (status) => {
         setIsRealtimeConnected(status === "SUBSCRIBED");
+        if (status === "SUBSCRIBED") {
+          await channel.track({
+            user_id: sessionUser.id,
+            username: sessionUser.username,
+            display_name: sessionUser.displayName,
+            online_at: new Date().toISOString(),
+          });
+        }
       });
 
     return () => {
