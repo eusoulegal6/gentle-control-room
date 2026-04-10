@@ -233,6 +233,7 @@ const Desktop = () => {
       createdAt: row.created_at as string,
       deliveredAt: (row.delivered_at as string) ?? null,
       readAt: (row.read_at as string) ?? null,
+      acknowledgedAt: (row.acknowledged_at as string) ?? null,
     };
 
     if (!notifiedAlertIdsRef.current.has(incomingAlert.id)) {
@@ -428,6 +429,7 @@ const Desktop = () => {
             createdAt: row.created_at as string,
             deliveredAt: (row.delivered_at as string) ?? null,
             readAt: (row.read_at as string) ?? null,
+            acknowledgedAt: (row.acknowledged_at as string) ?? null,
           });
         },
       )
