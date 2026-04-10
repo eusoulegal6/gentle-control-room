@@ -32,6 +32,7 @@ ArchitecturesInstallIn64BitMode=x64compatible
 PrivilegesRequired=admin
 PrivilegesRequiredOverridesAllowed=dialog
 AllowNoIcons=yes
+SetupIconFile=..\desktop\GentleControlRoom.Desktop\Assets\app-icon.ico
 UninstallDisplayIcon={app}\{#AppExeName}
 
 [Languages]
