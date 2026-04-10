@@ -40,6 +40,7 @@ export type Database = {
       }
       alerts: {
         Row: {
+          acknowledged_at: string | null
           created_at: string
           created_by: string | null
           delivered_at: string | null
@@ -53,6 +54,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          acknowledged_at?: string | null
           created_at?: string
           created_by?: string | null
           delivered_at?: string | null
@@ -66,6 +68,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          acknowledged_at?: string | null
           created_at?: string
           created_by?: string | null
           delivered_at?: string | null

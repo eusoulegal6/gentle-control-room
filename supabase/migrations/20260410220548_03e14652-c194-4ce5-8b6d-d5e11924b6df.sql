@@ -1,0 +1,1 @@
+ALTER TABLE public.alerts ADD COLUMN acknowledged_at timestamptz;
