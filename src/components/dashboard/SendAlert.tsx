@@ -220,8 +220,7 @@ const SendAlert = () => {
 
               {/* Dropdown */}
               {showDropdown && (
-                <div className="absolute z-50 mt-1 w-full rounded-md border border-border bg-popover shadow-md">
-                  <ScrollArea className="max-h-[240px]">
+                <div className="absolute z-50 mt-1 w-full rounded-md border border-border bg-popover shadow-md max-h-[240px] overflow-y-auto">
                     {/* Select All */}
                     {!query && activeUsers.length > 0 && selectedUsers.size < activeUsers.length && (
                       <button
@@ -272,7 +271,7 @@ const SendAlert = () => {
                         ))}
                       </div>
                     )}
-                  </ScrollArea>
+                  
                 </div>
               )}
             </div>
