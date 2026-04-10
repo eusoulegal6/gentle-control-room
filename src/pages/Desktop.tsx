@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { BellRing, User } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { BellRing, Check, User } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -575,10 +575,13 @@ const Desktop = () => {
                                 {new Date(alert.createdAt).toLocaleString()}
                               </p>
                             </div>
-                            {alert.status !== "READ" && (
-                              <Button variant="outline" size="sm" className="h-7 text-xs shrink-0" onClick={() => void handleMarkAsRead(alert.id)}>
-                                Mark read
-                              </Button>
+                            {alert.status === "DELIVERED" && (
+                              <ConfirmCountdownButton alertId={alert.id} onConfirm={handleAcknowledge} />
+                            )}
+                            {alert.status === "ACKNOWLEDGED" && (
+                              <Badge variant="secondary" className="text-[0.65rem] px-1.5 py-0 bg-green-100 text-green-700">
+                                <Check className="h-3 w-3 mr-0.5" /> Confirmed
+                              </Badge>
                             )}
                           </div>
                         </div>
