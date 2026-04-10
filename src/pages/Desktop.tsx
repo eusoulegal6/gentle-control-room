@@ -11,7 +11,7 @@ import { useDesktopPreferredWindowSize } from "@/hooks/use-desktop-preferred-win
 import { supabase } from "@/integrations/supabase/client";
 import { buildJsonRequestInit, getDesktopConfig, getEdgeFunctionsBaseUrl, getSupabaseAnonKey, parseApiResponse, postDesktopHostMessage } from "@/lib/api";
 
-type DesktopAlertStatus = "PENDING" | "DELIVERED" | "READ";
+type DesktopAlertStatus = "PENDING" | "DELIVERED" | "READ" | "ACKNOWLEDGED";
 
 interface DesktopSessionUser {
   id: string;
@@ -29,6 +29,7 @@ interface DesktopAlert {
   createdAt: string;
   deliveredAt: string | null;
   readAt: string | null;
+  acknowledgedAt: string | null;
 }
 
 interface DesktopAuthResponse {
@@ -59,6 +60,7 @@ const badgeVariant: Record<DesktopAlertStatus, "outline" | "default" | "secondar
   PENDING: "outline",
   DELIVERED: "default",
   READ: "secondary",
+  ACKNOWLEDGED: "secondary",
 };
 
 const Desktop = () => {
