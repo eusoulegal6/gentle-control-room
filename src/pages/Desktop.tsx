@@ -501,7 +501,7 @@ const Desktop = () => {
   }
 
   return (
-    <div className="bg-background px-3 py-2">
+    <div className="min-h-screen bg-background px-3 py-2">
       <div className="mx-auto max-w-2xl space-y-2.5">
         <Card className="shadow-card">
           <CardContent className="flex items-center justify-between px-3 py-2">
