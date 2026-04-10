@@ -1,59 +1,40 @@
 
 
-## Problem Analysis
+## Plan: Simplify Desktop Page Layout + Fix Build Errors
 
-The native Windows notification bridge code exists in `Desktop.tsx` but has two failure paths:
+### 1. Simplify the top card (lines 506-534 of `src/pages/Desktop.tsx`)
 
-1. **Realtime subscription is dead**: The Supabase Realtime channel subscribes to the `alerts` table using the `anon` key, but the table's RLS policy blocks anonymous reads. The subscription silently receives zero events, so `handleIncomingRealtimeAlert` (which calls `notifyNativeHost`) never fires.
+Replace the current hero-style top card with a compact action bar containing only the two buttons:
 
-2. **Polling notification logic is too narrow**: In `fetchAlerts()` (lines 271-281), native notifications are only sent when `pendingAlerts.length > 0`. If an alert is already marked `DELIVERED` by the edge function (or another mechanism) before the poll runs, the notification block is skipped entirely. This means alerts can appear in the UI list without ever triggering a native Windows popup.
-
-## Plan
-
-### 1. Fix polling to notify for ALL unseen alerts, not just pending ones
-
-In `fetchAlerts()`, after fetching the latest alerts, compare the full list against `notifiedAlertIdsRef` and call `notifyNativeHost` for any alert not yet notified — regardless of its current status. Move the notification logic outside the `if (pendingAlerts.length > 0)` guard.
-
-**File**: `src/pages/Desktop.tsx` (lines ~260-283)
-
-```typescript
-// After setting alerts, notify for any unseen alerts
-const knownIds = new Set(notifiedAlertIdsRef.current);
-const unseenAlerts = latestPayload.alerts.filter(
-  (alert) => !knownIds.has(alert.id)
-);
-for (const alert of unseenAlerts) {
-  notifyNativeHost(alert);
-  knownIds.add(alert.id);
-}
-syncNotifiedAlertIds(knownIds);
-
-setAlerts(sortAlertsByNewest(latestPayload.alerts));
+```
+┌─────────────────────────────────────────────────┐
+│  [Run In Background]              [Sign out]    │
+└─────────────────────────────────────────────────┘
 ```
 
-### 2. Make `notifyNativeHost` work even without full desktop config
+Remove: "BACKGROUND CLIENT" label, "Running and ready" title, description paragraph, all badges (realtime/tray/version).
 
-Currently the guard `if (!desktopConfig?.enableNativeNotifications) return;` silently blocks notifications if `__desktopConfig` isn't injected or the flag is missing. Change to also check for the webview bridge directly — if the bridge exists, always attempt to post the message.
+### 2. Keep remaining sections unchanged
 
-**File**: `src/pages/Desktop.tsx` (line 206)
+- "Signed in as" card stays as-is
+- "Latest alerts" card stays as-is
+- No Sync button reintroduced
 
+### 3. Fix build errors in Edge Functions
+
+**`supabase/functions/_shared/password.ts`** (line 51): Cast `salt` to `Uint8Array` to satisfy the `BufferSource` type:
 ```typescript
-const notifyNativeHost = (alert: DesktopAlert) => {
-  // Skip only if config explicitly disables notifications
-  if (desktopConfig && desktopConfig.enableNativeNotifications === false) return;
-  // Skip if no bridge available
-  if (!window.chrome?.webview?.postMessage) return;
-  postDesktopHostMessage({ ... });
-};
+{ name: "PBKDF2", salt: salt as Uint8Array, iterations, hash: "SHA-256" }
 ```
 
-### 3. No backend or .NET changes needed
+**All four edge function catch blocks** (`admin-alerts`, `admin-users`, `desktop-alerts`, `desktop-auth`): Change `catch (err)` to `catch (err: unknown)` and use `(err instanceof Error ? err.message : "Internal server error")`.
 
-The edge functions, RLS, and .NET host code are all correct. The issue is purely in the React frontend's notification dispatch logic.
+### Files to modify
 
-### Technical details
-
-- **Files modified**: `src/pages/Desktop.tsx` only
-- **Risk**: Low — only changes when `notifyNativeHost` is called, does not affect alert list rendering or delivery status updates
-- **Duplicate prevention**: The existing `notifiedAlertIdsRef` + localStorage mechanism already prevents duplicate notifications across renders and sessions
+- `src/pages/Desktop.tsx` — simplify top card layout
+- `supabase/functions/_shared/password.ts` — fix BufferSource type error
+- `supabase/functions/admin-alerts/index.ts` — fix unknown error type
+- `supabase/functions/admin-users/index.ts` — fix unknown error type
+- `supabase/functions/desktop-alerts/index.ts` — fix unknown error type
+- `supabase/functions/desktop-auth/index.ts` — fix unknown error type
 
