@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users, Send, History, Shield, Monitor } from "lucide-react";
+import { LayoutDashboard, Users, Send, History, Shield, Monitor, FolderOpen } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
 import {
@@ -15,6 +15,7 @@ import {
 const items = [
   { title: "Overview", url: "/dashboard", icon: LayoutDashboard },
   { title: "User Management", url: "/dashboard/users", icon: Users },
+  { title: "Groups", url: "/dashboard/groups", icon: FolderOpen },
   { title: "Send Alert", url: "/dashboard/send-alert", icon: Send },
   { title: "Alert History", url: "/dashboard/alerts", icon: History },
   { title: "Desktop App", url: "/dashboard/desktop-app", icon: Monitor },
