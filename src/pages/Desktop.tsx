@@ -503,33 +503,14 @@ const Desktop = () => {
   return (
     <div className="min-h-screen bg-background px-4 py-6">
       <div className="mx-auto max-w-4xl space-y-6">
-        <Card className="shadow-elevated">
-          <CardContent className="flex flex-col gap-6 p-6 md:flex-row md:items-center md:justify-between">
-            <div className="space-y-3">
-              <p className="text-sm uppercase tracking-[0.18em] text-primary">Background Client</p>
-              <div>
-                <h1 className="text-4xl font-semibold tracking-tight">Running and ready</h1>
-                <p className="mt-2 max-w-2xl text-base text-muted-foreground">
-                  The app stays in the background and shows alerts as soon as they arrive.
-                </p>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <Badge variant={isRealtimeConnected ? "default" : "outline"}>
-                  {isRealtimeConnected ? "Realtime connected" : "Polling fallback"}
-                </Badge>
-                <Badge variant="secondary">Tray-enabled</Badge>
-                <Badge variant="outline">v{desktopConfig?.appVersion ?? "0.1.0"}</Badge>
-              </div>
-            </div>
-
-            <div className="flex flex-wrap gap-3">
-              <Button onClick={requestHideToTray} className="gradient-primary text-primary-foreground">
-                Run In Background
-              </Button>
-              <Button variant="ghost" onClick={handleLogout}>
-                Sign out
-              </Button>
-            </div>
+        <Card className="shadow-card">
+          <CardContent className="flex items-center justify-between p-4">
+            <Button onClick={requestHideToTray} className="gradient-primary text-primary-foreground">
+              Run In Background
+            </Button>
+            <Button variant="ghost" onClick={handleLogout}>
+              Sign out
+            </Button>
           </CardContent>
         </Card>
 
