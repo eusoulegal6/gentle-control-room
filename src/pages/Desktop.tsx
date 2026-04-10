@@ -63,6 +63,40 @@ const badgeVariant: Record<DesktopAlertStatus, "outline" | "default" | "secondar
   ACKNOWLEDGED: "secondary",
 };
 
+const CONFIRM_DELAY_SECONDS = 5;
+
+const ConfirmCountdownButton = ({ alertId, onConfirm }: { alertId: string; onConfirm: (id: string) => Promise<void> }) => {
+  const [countdown, setCountdown] = useState(CONFIRM_DELAY_SECONDS);
+  const [isConfirming, setIsConfirming] = useState(false);
+
+  useEffect(() => {
+    if (countdown <= 0) return;
+    const timer = setTimeout(() => setCountdown((c) => c - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [countdown]);
+
+  const handleClick = async () => {
+    setIsConfirming(true);
+    try {
+      await onConfirm(alertId);
+    } finally {
+      setIsConfirming(false);
+    }
+  };
+
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      className="h-7 text-xs shrink-0"
+      disabled={countdown > 0 || isConfirming}
+      onClick={() => void handleClick()}
+    >
+      {isConfirming ? "..." : countdown > 0 ? `Confirm (${countdown}s)` : "Confirm"}
+    </Button>
+  );
+};
+
 const Desktop = () => {
   const edgeFunctionsBaseUrl = useMemo(() => getEdgeFunctionsBaseUrl(), []);
   const anonKey = useMemo(() => getSupabaseAnonKey(), []);
