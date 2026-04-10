@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 
 const DOWNLOAD_URL =
-  "https://ipwmfdsnzjhzeofwwptk.supabase.co/storage/v1/object/public/downloads/GentleControlRoom-Setup-0.1.0.exe";
+  "https://ipwmfdsnzjhzeofwwptk.supabase.co/storage/v1/object/public/downloads/GentleControlRoom-Setup-0.1.1.exe";
 
 const steps = [
   {
@@ -58,7 +58,7 @@ const DesktopApp = () => {
                 Gentle Control Room for Windows
               </h3>
               <p className="text-primary-foreground/80 text-sm">
-                Version 0.1.0 · Windows 10/11 (x64)
+                Version 0.1.1 · Windows 10/11 (x64)
               </p>
               <a href={DOWNLOAD_URL} download>
                 <Button
