@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Download, Monitor, CheckCircle, Bell, LogIn, KeyRound, UserPlus, Upload, Loader2 } from "lucide-react";
+import ReleaseNotes from "./ReleaseNotes";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -170,14 +171,6 @@ const DesktopApp = () => {
                   </div>
                 ))}
               </div>
-              {latestRelease?.releaseNotes && (
-                <div className="border-t border-border pt-4">
-                  <p className="text-xs font-semibold text-foreground mb-1">What's new in v{latestRelease.version}</p>
-                  <p className="text-xs text-muted-foreground leading-relaxed whitespace-pre-line">
-                    {latestRelease.releaseNotes}
-                  </p>
-                </div>
-              )}
             </div>
           </CardContent>
         </Card>
@@ -220,6 +213,11 @@ const DesktopApp = () => {
           </div>
         </div>
       </div>
+
+      {/* Structured release notes */}
+      {latestRelease?.releaseNotes && (
+        <ReleaseNotes version={latestRelease.version} notes={latestRelease.releaseNotes} />
+      )}
 
       {/* Publish New Version — developer only */}
       {adminRole === "developer" && <Card className="shadow-elevated border-border">
