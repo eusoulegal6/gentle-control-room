@@ -156,18 +156,28 @@ const DesktopApp = () => {
                 </Button>
               </a>
             </div>
-            <div className="p-6 space-y-3">
-              {[
-                "Runs silently in system tray",
-                "Minimal resource usage",
-                "Auto-starts with Windows",
-                "No admin privileges required",
-              ].map((text) => (
-                <div key={text} className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <CheckCircle className="w-4 h-4 text-success flex-shrink-0" />
-                  {text}
+            <div className="p-6 space-y-4">
+              <div className="space-y-3">
+                {[
+                  "Runs silently in system tray",
+                  "Minimal resource usage",
+                  "Auto-starts with Windows",
+                  "No admin privileges required",
+                ].map((text) => (
+                  <div key={text} className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <CheckCircle className="w-4 h-4 text-success flex-shrink-0" />
+                    {text}
+                  </div>
+                ))}
+              </div>
+              {latestRelease?.releaseNotes && (
+                <div className="border-t border-border pt-4">
+                  <p className="text-xs font-semibold text-foreground mb-1">What's new in v{latestRelease.version}</p>
+                  <p className="text-xs text-muted-foreground leading-relaxed whitespace-pre-line">
+                    {latestRelease.releaseNotes}
+                  </p>
                 </div>
-              ))}
+              )}
             </div>
           </CardContent>
         </Card>
