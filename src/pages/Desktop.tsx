@@ -166,6 +166,19 @@ const Desktop = () => {
         { accessToken: payload.tokens.accessToken, refreshToken: payload.tokens.refreshToken },
         payload.user,
       );
+
+      // Notify the native Windows host of the refreshed session
+      postDesktopHostMessage({
+        type: "desktop.auth.session",
+        payload: {
+          accessToken: payload.tokens.accessToken,
+          refreshToken: payload.tokens.refreshToken,
+          apiKey: anonKey,
+          userId: payload.user.id,
+          username: payload.user.username,
+        },
+      });
+
       return true;
     } catch {
       syncAuth({ accessToken: null, refreshToken: null }, null);
@@ -338,6 +351,18 @@ const Desktop = () => {
         { accessToken: payload.tokens.accessToken, refreshToken: payload.tokens.refreshToken },
         payload.user,
       );
+
+      // Notify the native Windows host of the authenticated session
+      postDesktopHostMessage({
+        type: "desktop.auth.session",
+        payload: {
+          accessToken: payload.tokens.accessToken,
+          refreshToken: payload.tokens.refreshToken,
+          apiKey: anonKey,
+          userId: payload.user.id,
+          username: payload.user.username,
+        },
+      });
 
       setFeedback("Signed in. The app will continue running in the background.");
       setFeedbackTone("success");
