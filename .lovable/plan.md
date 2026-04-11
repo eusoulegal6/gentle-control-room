@@ -1,58 +1,32 @@
 
 
-# App Update Notification System
+# Restrict "Publish New Version" Panel to Developers
 
-## Summary
-Add a version-check system so the desktop app auto-detects new versions, plus let admins manually broadcast update alerts with changelog and download links from the dashboard.
+## Approach
+Add a `role` distinction to `admin_profiles`. Currently all admins have `role = 'admin'`. We'll support an additional value `'developer'`. Only admins with `role = 'developer'` will see the "Publish New Version" panel — all other admins see the download card and setup guide as usual.
 
-## Database Change
-- Create an `app_releases` table to track published versions:
-  - `id` (uuid, PK)
-  - `version` (text, unique, not null) — e.g. "0.2.0"
-  - `download_url` (text, not null)
-  - `release_notes` (text)
-  - `published_at` (timestamptz, default now())
-  - `created_by` (uuid, nullable)
-- RLS: admins can SELECT/INSERT/UPDATE; anon can SELECT (desktop clients need to read the latest version).
+This is lightweight: one column already exists (`role` on `admin_profiles`, defaulting to `'admin'`), so we just need to allow a second value and gate the UI.
 
-## Edge Function: `app-releases`
-- **GET** (no auth required): Returns the latest release (`version`, `download_url`, `release_notes`, `published_at`). The desktop app polls this.
-- **POST** (admin auth required): Publishes a new release record. Accepts `version`, `download_url`, `release_notes`.
-- **POST with `notify: true`**: After inserting the release, bulk-inserts an alert to all active desktop users with the release notes and download link as the alert message.
+## Changes
 
-## Desktop App Changes
+### 1. Database
+- No schema change needed — `admin_profiles.role` is already a `text` column defaulting to `'admin'`. We simply store `'developer'` for privileged admins.
+- To promote an admin, run: `UPDATE admin_profiles SET role = 'developer' WHERE email = '...'` (or build a UI later).
 
-### Auto-detect (`desktop/…/wwwroot/app.js`)
-- On login and every polling cycle, call `GET /app-releases` to fetch the latest version.
-- Compare against `config.appVersion`. If server version is newer, show a persistent banner at the top of the UI: "Update available: v0.2.0 — [Download] [Dismiss]".
-- The download link opens the URL from the release record.
+### 2. Admin Context (`src/context/AdminContext.tsx`)
+- Fetch the current admin's `role` from `admin_profiles` after login.
+- Expose `adminRole` (string) on the context so components can check it.
 
-### React Desktop page (`src/pages/Desktop.tsx`)
-- Same logic for the hosted web view: fetch latest release, compare with a build-time version constant, show banner if outdated.
+### 3. Desktop App page (`src/components/dashboard/DesktopApp.tsx`)
+- Read `adminRole` from context.
+- Conditionally render the "Publish New Version" card only when `adminRole === 'developer'`.
 
-## Admin Dashboard Changes
+### 4. Edge Function (`app-releases` POST)
+- Add a server-side check: verify the calling admin's profile has `role = 'developer'` before allowing a publish. Return 403 otherwise.
 
-### DesktopApp.tsx — Version management
-- Below the existing download card, add a "Publish New Version" section:
-  - Fields: Version number, Download URL, Release notes (textarea).
-  - Checkbox: "Notify all desktop users" (sends an update alert to everyone).
-  - Submit button calls `POST /app-releases`.
-- Display the current published version pulled from `GET /app-releases`.
+## What regular admins see
+The download card, setup guide, and tip — exactly as before, minus the publish form.
 
-### Update the download card dynamically
-- Fetch the latest release on mount. Use its `download_url` and `version` instead of the hardcoded `DOWNLOAD_URL` constant, so the card always points to the latest installer.
-
-## Technical Details
-
-```text
-Admin publishes release
-  → POST /app-releases (insert row + optional bulk alert)
-  → Desktop apps detect on next poll cycle
-  → Banner: "Update v0.2.0 available" + Download button
-
-Version comparison: simple semver string compare (split on dots, compare numerically).
-```
-
-- No changes to the .NET host code — the banner lives in the WebView HTML/JS layer.
-- The `app_releases` table doubles as the source of truth for the download URL on the admin dashboard, replacing the hardcoded constant.
+## What developers see
+Everything above, plus the "Publish New Version" panel at the bottom.
 
