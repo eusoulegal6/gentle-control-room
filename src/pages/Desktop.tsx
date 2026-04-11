@@ -339,6 +339,18 @@ const Desktop = () => {
         payload.user,
       );
 
+      // Notify the native Windows host of the authenticated session
+      postDesktopHostMessage({
+        type: "desktop.auth.session",
+        payload: {
+          accessToken: payload.tokens.accessToken,
+          refreshToken: payload.tokens.refreshToken,
+          apiKey: anonKey,
+          userId: payload.user.id,
+          username: payload.user.username,
+        },
+      });
+
       setFeedback("Signed in. The app will continue running in the background.");
       setFeedbackTone("success");
       setUsername("");
