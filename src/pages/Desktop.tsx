@@ -405,6 +405,8 @@ const Desktop = () => {
         { status: "ACKNOWLEDGED" },
       );
       upsertAlert(payload.alert);
+      // Immediately refetch to stay in sync with backend
+      await fetchAlerts();
     } catch (error) {
       setFeedback(error instanceof Error ? error.message : "Unable to acknowledge alert.");
       setFeedbackTone("error");
@@ -514,15 +516,35 @@ const Desktop = () => {
   useEffect(() => {
     if (!sessionUser) return;
 
-    const handler = (event: Event) => {
-      const detail = (event as CustomEvent<{ alertId: string }>).detail;
-      if (detail?.alertId) {
-        void handleAcknowledge(detail.alertId);
+    const handleHostConfirm = async (event: Event) => {
+      const detail = (event as CustomEvent<{ alertId: string; acknowledgedAt?: string }>).detail;
+      if (!detail?.alertId) return;
+
+      // Optimistic local update
+      setAlerts((current) =>
+        sortAlertsByNewest(
+          current.map((a) =>
+            a.id === detail.alertId
+              ? { ...a, status: "ACKNOWLEDGED" as DesktopAlertStatus, acknowledgedAt: detail.acknowledgedAt ?? new Date().toISOString() }
+              : a,
+          ),
+        ),
+      );
+
+      // The native host may have already PATCHed the backend, so just refetch
+      try {
+        await fetchAlerts();
+      } catch {
+        // polling will catch up
       }
     };
 
-    window.addEventListener("desktop-host-confirm-alert", handler);
-    return () => window.removeEventListener("desktop-host-confirm-alert", handler);
+    window.addEventListener("desktop-host-alert-confirmed", handleHostConfirm);
+    window.addEventListener("desktop-host-confirm-alert", handleHostConfirm);
+    return () => {
+      window.removeEventListener("desktop-host-alert-confirmed", handleHostConfirm);
+      window.removeEventListener("desktop-host-confirm-alert", handleHostConfirm);
+    };
   }, [sessionUser]);
 
   // Polling fallback
