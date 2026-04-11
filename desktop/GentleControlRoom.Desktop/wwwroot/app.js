@@ -10,7 +10,8 @@ const state = {
   accessToken: null,
   refreshToken: null,
   user: null,
-  pollingHandle: null
+  pollingHandle: null,
+  updateDismissed: false
 };
 
 const apiBaseUrl = config.apiBaseUrl.replace(/\/$/, "");
@@ -24,7 +25,8 @@ const elements = {
   loginFeedback: document.getElementById("login-feedback"),
   logoutButton: document.getElementById("logout-button"),
   refreshAlerts: document.getElementById("refresh-alerts"),
-  alertList: document.getElementById("alert-list")
+  alertList: document.getElementById("alert-list"),
+  updateBanner: document.getElementById("update-banner")
 };
 
 function setFeedback(message, kind = "error") {
@@ -78,6 +80,65 @@ function updateSessionUi() {
     elements.logoutButton.disabled = true;
   }
 }
+
+// --- Version comparison ---
+
+function compareVersions(a, b) {
+  const pa = a.split(".").map(Number);
+  const pb = b.split(".").map(Number);
+  const len = Math.max(pa.length, pb.length);
+  for (let i = 0; i < len; i++) {
+    const na = pa[i] || 0;
+    const nb = pb[i] || 0;
+    if (na > nb) return 1;
+    if (na < nb) return -1;
+  }
+  return 0;
+}
+
+function showUpdateBanner(version, downloadUrl) {
+  if (!elements.updateBanner || state.updateDismissed) return;
+  elements.updateBanner.innerHTML = `
+    <span>Update available: <strong>v${escapeHtml(version)}</strong></span>
+    <span class="update-actions">
+      <a href="${escapeHtml(downloadUrl)}" target="_blank" rel="noopener" class="update-download">Download</a>
+      <button type="button" class="update-dismiss" id="dismiss-update">Dismiss</button>
+    </span>`;
+  elements.updateBanner.style.display = "flex";
+
+  document.getElementById("dismiss-update")?.addEventListener("click", () => {
+    state.updateDismissed = true;
+    elements.updateBanner.style.display = "none";
+  });
+}
+
+function hideUpdateBanner() {
+  if (elements.updateBanner) {
+    elements.updateBanner.style.display = "none";
+  }
+}
+
+async function checkForUpdate() {
+  try {
+    const response = await fetch(`${apiBaseUrl}/app-releases`, {
+      headers: { "Content-Type": "application/json" }
+    });
+    if (!response.ok) return;
+    const payload = await response.json();
+    const release = payload.release;
+    if (!release) return;
+
+    if (compareVersions(release.version, config.appVersion) > 0) {
+      showUpdateBanner(release.version, release.downloadUrl);
+    } else {
+      hideUpdateBanner();
+    }
+  } catch (err) {
+    console.error("Version check failed:", err);
+  }
+}
+
+// --- API ---
 
 async function apiRequest(path, init = {}) {
   const headers = new Headers(init.headers ?? {});
@@ -252,11 +313,16 @@ function startPolling() {
     return;
   }
 
+  const intervalMs = Math.max(config.alertPollingSeconds, 5) * 1000;
+
   state.pollingHandle = window.setInterval(() => {
     fetchAlerts().catch((error) => {
       console.error(error);
     });
-  }, Math.max(config.alertPollingSeconds, 5) * 1000);
+    checkForUpdate().catch((error) => {
+      console.error(error);
+    });
+  }, intervalMs);
 }
 
 elements.loginForm.addEventListener("submit", async (event) => {
@@ -289,6 +355,7 @@ elements.loginForm.addEventListener("submit", async (event) => {
     setFeedback("Desktop session established.", "success");
     startPolling();
     await fetchAlerts();
+    await checkForUpdate();
     elements.loginForm.reset();
   } catch (error) {
     clearSession();
@@ -312,6 +379,7 @@ elements.logoutButton.addEventListener("click", async () => {
     clearSession();
     updateSessionUi();
     renderAlerts([]);
+    hideUpdateBanner();
     setFeedback("Signed out.", "success");
   }
 });
@@ -332,6 +400,9 @@ if (state.user) {
   setFeedback("Restored previous session.", "success");
   fetchAlerts().catch((error) => {
     setFeedback(error.message || "Unable to load alerts.");
+  });
+  checkForUpdate().catch((error) => {
+    console.error("Version check failed:", error);
   });
   startPolling();
 } else {

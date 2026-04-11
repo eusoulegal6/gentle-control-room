@@ -98,6 +98,39 @@ export type Database = {
           },
         ]
       }
+      app_releases: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          download_url: string
+          id: string
+          published_at: string
+          release_notes: string | null
+          updated_at: string
+          version: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          download_url: string
+          id?: string
+          published_at?: string
+          release_notes?: string | null
+          updated_at?: string
+          version: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          download_url?: string
+          id?: string
+          published_at?: string
+          release_notes?: string | null
+          updated_at?: string
+          version?: string
+        }
+        Relationships: []
+      }
       desktop_sessions: {
         Row: {
           created_at: string
