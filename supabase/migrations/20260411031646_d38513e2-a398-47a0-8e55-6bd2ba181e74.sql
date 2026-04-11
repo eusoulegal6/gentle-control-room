@@ -1,0 +1,2 @@
+ALTER TABLE public.alerts DROP CONSTRAINT alerts_status_check;
+ALTER TABLE public.alerts ADD CONSTRAINT alerts_status_check CHECK (status = ANY (ARRAY['PENDING'::text, 'DELIVERED'::text, 'READ'::text, 'ACKNOWLEDGED'::text]));
