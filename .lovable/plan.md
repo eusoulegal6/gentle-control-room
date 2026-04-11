@@ -1,46 +1,58 @@
 
 
-# Alert Acknowledgment Feature
+# App Update Notification System
 
 ## Summary
-Add a mandatory "Confirm" button to each alert on the desktop client. The button is disabled for 5 seconds after the alert appears, forcing the employee to wait before acknowledging. Once confirmed, a new `ACKNOWLEDGED` status is recorded with a timestamp, visible to the admin in the Alert History.
+Add a version-check system so the desktop app auto-detects new versions, plus let admins manually broadcast update alerts with changelog and download links from the dashboard.
 
 ## Database Change
-- Add `acknowledged_at` (nullable timestamp) column to the `alerts` table.
-- Add `ACKNOWLEDGED` as a valid status value (the status column is a text field, so no enum migration needed).
+- Create an `app_releases` table to track published versions:
+  - `id` (uuid, PK)
+  - `version` (text, unique, not null) — e.g. "0.2.0"
+  - `download_url` (text, not null)
+  - `release_notes` (text)
+  - `published_at` (timestamptz, default now())
+  - `created_by` (uuid, nullable)
+- RLS: admins can SELECT/INSERT/UPDATE; anon can SELECT (desktop clients need to read the latest version).
 
-## Edge Function Changes (`desktop-alerts`)
-- Accept `{ status: "ACKNOWLEDGED" }` in the PATCH handler, setting `status = 'ACKNOWLEDGED'` and `acknowledged_at = now()`.
-- Include `acknowledgedAt` in all serialized alert responses.
+## Edge Function: `app-releases`
+- **GET** (no auth required): Returns the latest release (`version`, `download_url`, `release_notes`, `published_at`). The desktop app polls this.
+- **POST** (admin auth required): Publishes a new release record. Accepts `version`, `download_url`, `release_notes`.
+- **POST with `notify: true`**: After inserting the release, bulk-inserts an alert to all active desktop users with the release notes and download link as the alert message.
 
-## Edge Function Changes (`admin-alerts`)
-- Include `acknowledged_at` in the alert serialization so the admin dashboard receives it.
+## Desktop App Changes
 
-## Desktop Client (`src/pages/Desktop.tsx`)
-- Add `ACKNOWLEDGED` to the `DesktopAlertStatus` type and badge variant map.
-- Replace the current "Mark read" button with a "Confirm" button that:
-  - Appears for alerts with status `DELIVERED` (not yet acknowledged).
-  - Starts **disabled** with a 5-second countdown timer displayed on the button (e.g., "Confirm (5s)", "Confirm (4s)", ...).
-  - Becomes enabled after 5 seconds, showing just "Confirm".
-  - On click, PATCHes the alert to `ACKNOWLEDGED`.
-- Track countdown per alert using a `useEffect` + `setTimeout` pattern keyed to the alert's `deliveredAt` timestamp.
+### Auto-detect (`desktop/…/wwwroot/app.js`)
+- On login and every polling cycle, call `GET /app-releases` to fetch the latest version.
+- Compare against `config.appVersion`. If server version is newer, show a persistent banner at the top of the UI: "Update available: v0.2.0 — [Download] [Dismiss]".
+- The download link opens the URL from the release record.
 
-## Desktop Client (`desktop/…/wwwroot/app.js`)
-- Mirror the same logic: render a disabled confirm button with a 5-second countdown, then enable it. On click, PATCH to `ACKNOWLEDGED`.
+### React Desktop page (`src/pages/Desktop.tsx`)
+- Same logic for the hosted web view: fetch latest release, compare with a build-time version constant, show banner if outdated.
 
-## Admin Dashboard (`AlertHistory.tsx` + `AdminContext.tsx`)
-- Add `ACKNOWLEDGED` to the status badge map (use a distinct color like green).
-- Display `acknowledgedAt` timestamp in the alert history table as a new "Acknowledged" column.
-- Update the `Alert` interface in `AdminContext.tsx` to include `acknowledgedAt`.
+## Admin Dashboard Changes
+
+### DesktopApp.tsx — Version management
+- Below the existing download card, add a "Publish New Version" section:
+  - Fields: Version number, Download URL, Release notes (textarea).
+  - Checkbox: "Notify all desktop users" (sends an update alert to everyone).
+  - Submit button calls `POST /app-releases`.
+- Display the current published version pulled from `GET /app-releases`.
+
+### Update the download card dynamically
+- Fetch the latest release on mount. Use its `download_url` and `version` instead of the hardcoded `DOWNLOAD_URL` constant, so the card always points to the latest installer.
 
 ## Technical Details
 
 ```text
-Alert lifecycle:  PENDING → DELIVERED → ACKNOWLEDGED
-                                    (5s delay before confirm enabled)
+Admin publishes release
+  → POST /app-releases (insert row + optional bulk alert)
+  → Desktop apps detect on next poll cycle
+  → Banner: "Update v0.2.0 available" + Download button
+
+Version comparison: simple semver string compare (split on dots, compare numerically).
 ```
 
-- Migration: `ALTER TABLE alerts ADD COLUMN acknowledged_at timestamptz;`
-- The 5-second delay is purely client-side (countdown from when the alert card renders or from `deliveredAt`, whichever is later).
-- No changes to the native notification bridge — the confirm action happens in the WebView UI, not the Windows toast.
+- No changes to the .NET host code — the banner lives in the WebView HTML/JS layer.
+- The `app_releases` table doubles as the source of truth for the download URL on the admin dashboard, replacing the hardcoded constant.
 
