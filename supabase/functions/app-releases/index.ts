@@ -67,7 +67,7 @@ Deno.serve(async (req) => {
 
       const { data: adminProfile } = await supabase
         .from("admin_profiles")
-        .select("id, email")
+        .select("id, email, role")
         .eq("id", adminId)
         .single();
 
