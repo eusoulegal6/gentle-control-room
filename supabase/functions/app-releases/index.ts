@@ -78,6 +78,13 @@ Deno.serve(async (req) => {
         });
       }
 
+      if (adminProfile.role !== "developer") {
+        return new Response(JSON.stringify({ error: "Only developers can publish releases" }), {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
       const body = await req.json();
       const { version, downloadUrl, releaseNotes, notify } = body;
 

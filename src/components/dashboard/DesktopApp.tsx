@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useAdmin } from "@/context/AdminContext";
 
 interface AppRelease {
   id: string;
@@ -54,6 +55,7 @@ const FALLBACK_DOWNLOAD_URL =
 const FALLBACK_VERSION = "0.1.1";
 
 const DesktopApp = () => {
+  const { adminRole } = useAdmin();
   const [latestRelease, setLatestRelease] = useState<AppRelease | null>(null);
   const [isLoadingRelease, setIsLoadingRelease] = useState(true);
 
@@ -209,8 +211,8 @@ const DesktopApp = () => {
         </div>
       </div>
 
-      {/* Publish New Version */}
-      <Card className="shadow-elevated border-border">
+      {/* Publish New Version — developer only */}
+      {adminRole === "developer" && <Card className="shadow-elevated border-border">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-lg">
             <Upload className="w-5 h-5" />
@@ -272,7 +274,7 @@ const DesktopApp = () => {
             </Button>
           </form>
         </CardContent>
-      </Card>
+      </Card>}
     </div>
   );
 };

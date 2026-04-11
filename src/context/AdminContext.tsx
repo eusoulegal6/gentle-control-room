@@ -30,6 +30,7 @@ interface AdminContextType {
   isReady: boolean;
   isLoggedIn: boolean;
   adminEmail: string;
+  adminRole: string;
   users: AppUser[];
   alerts: Alert[];
   login: (email: string, password: string) => Promise<void>;
@@ -108,6 +109,7 @@ async function invokeEdgeFunctionWithPath<T>(functionName: string, path: string,
 export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isReady, setIsReady] = useState(false);
   const [adminEmail, setAdminEmail] = useState("");
+  const [adminRole, setAdminRole] = useState("admin");
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [users, setUsers] = useState<AppUser[]>([]);
   const [alerts, setAlerts] = useState<Alert[]>([]);
@@ -177,6 +179,16 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         setAdminEmail(session.user.email ?? "");
         setIsLoggedIn(true);
 
+        // Fetch admin role
+        supabase
+          .from("admin_profiles")
+          .select("role")
+          .eq("id", session.user.id)
+          .single()
+          .then(({ data }) => {
+            setAdminRole(data?.role ?? "admin");
+          });
+
         // Use setTimeout to avoid potential Supabase deadlock
         if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
           setTimeout(() => {
@@ -185,6 +197,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         }
       } else {
         setAdminEmail("");
+        setAdminRole("admin");
         setIsLoggedIn(false);
         setUsers([]);
         setAlerts([]);
@@ -197,6 +210,14 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (session?.user) {
         setAdminEmail(session.user.email ?? "");
         setIsLoggedIn(true);
+        supabase
+          .from("admin_profiles")
+          .select("role")
+          .eq("id", session.user.id)
+          .single()
+          .then(({ data }) => {
+            setAdminRole(data?.role ?? "admin");
+          });
         refreshAdminData().catch(console.error);
       }
       setIsReady(true);
@@ -210,6 +231,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       isReady,
       isLoggedIn,
       adminEmail,
+      adminRole,
       users,
       alerts,
       login,
@@ -221,7 +243,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       sendAlert,
       refreshAdminData,
     }),
-    [addUser, adminEmail, alerts, deleteUser, editUser, isLoggedIn, isReady, login, logout, refreshAdminData, register, sendAlert, users],
+    [addUser, adminEmail, adminRole, alerts, deleteUser, editUser, isLoggedIn, isReady, login, logout, refreshAdminData, register, sendAlert, users],
   );
 
   return <AdminContext.Provider value={value}>{children}</AdminContext.Provider>;
