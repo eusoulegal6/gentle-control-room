@@ -1,9 +1,22 @@
-import { Download, Monitor, CheckCircle, Bell, LogIn, KeyRound, UserPlus } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Download, Monitor, CheckCircle, Bell, LogIn, KeyRound, UserPlus, Upload, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
-const DOWNLOAD_URL =
-  "https://ipwmfdsnzjhzeofwwptk.supabase.co/storage/v1/object/public/downloads/GentleControlRoom-Setup-0.1.1.exe";
+interface AppRelease {
+  id: string;
+  version: string;
+  downloadUrl: string;
+  releaseNotes: string | null;
+  publishedAt: string;
+  createdBy: string | null;
+}
 
 const steps = [
   {
@@ -36,7 +49,78 @@ const steps = [
   },
 ];
 
+const FALLBACK_DOWNLOAD_URL =
+  "https://ipwmfdsnzjhzeofwwptk.supabase.co/storage/v1/object/public/downloads/GentleControlRoom-Setup-0.1.1.exe";
+const FALLBACK_VERSION = "0.1.1";
+
 const DesktopApp = () => {
+  const [latestRelease, setLatestRelease] = useState<AppRelease | null>(null);
+  const [isLoadingRelease, setIsLoadingRelease] = useState(true);
+
+  // Publish form state
+  const [newVersion, setNewVersion] = useState("");
+  const [newDownloadUrl, setNewDownloadUrl] = useState("");
+  const [newReleaseNotes, setNewReleaseNotes] = useState("");
+  const [notifyUsers, setNotifyUsers] = useState(false);
+  const [isPublishing, setIsPublishing] = useState(false);
+
+  const downloadUrl = latestRelease?.downloadUrl ?? FALLBACK_DOWNLOAD_URL;
+  const displayVersion = latestRelease?.version ?? FALLBACK_VERSION;
+
+  const fetchLatestRelease = async () => {
+    try {
+      const { data, error } = await supabase.functions.invoke("app-releases", {
+        method: "GET" as const,
+      });
+      if (error) throw error;
+      setLatestRelease(data?.release ?? null);
+    } catch (err) {
+      console.error("Failed to fetch latest release:", err);
+    } finally {
+      setIsLoadingRelease(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchLatestRelease();
+  }, []);
+
+  const handlePublish = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newVersion.trim() || !newDownloadUrl.trim()) {
+      toast.error("Version and download URL are required.");
+      return;
+    }
+
+    setIsPublishing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("app-releases", {
+        method: "POST" as const,
+        body: {
+          version: newVersion.trim(),
+          downloadUrl: newDownloadUrl.trim(),
+          releaseNotes: newReleaseNotes.trim() || null,
+          notify: notifyUsers,
+        },
+      });
+      if (error) {
+        const msg = typeof error === "object" && "message" in error ? (error as { message: string }).message : String(error);
+        throw new Error(msg);
+      }
+
+      toast.success(`Version ${newVersion} published!${notifyUsers ? " All desktop users have been notified." : ""}`);
+      setLatestRelease(data.release);
+      setNewVersion("");
+      setNewDownloadUrl("");
+      setNewReleaseNotes("");
+      setNotifyUsers(false);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to publish release.");
+    } finally {
+      setIsPublishing(false);
+    }
+  };
+
   return (
     <div className="space-y-8 max-w-4xl">
       <div>
@@ -58,9 +142,9 @@ const DesktopApp = () => {
                 Gentle Control Room for Windows
               </h3>
               <p className="text-primary-foreground/80 text-sm">
-                Version 0.1.1 · Windows 10/11 (x64)
+                {isLoadingRelease ? "Loading..." : `Version ${displayVersion} · Windows 10/11 (x64)`}
               </p>
-              <a href={DOWNLOAD_URL} download>
+              <a href={downloadUrl} download>
                 <Button
                   size="lg"
                   className="bg-primary-foreground text-primary hover:bg-primary-foreground/90 gap-2 mt-2 font-semibold"
@@ -124,6 +208,71 @@ const DesktopApp = () => {
           </div>
         </div>
       </div>
+
+      {/* Publish New Version */}
+      <Card className="shadow-elevated border-border">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <Upload className="w-5 h-5" />
+            Publish New Version
+          </CardTitle>
+          {latestRelease && (
+            <p className="text-sm text-muted-foreground">
+              Current published version: <span className="font-semibold text-foreground">v{latestRelease.version}</span>
+              {" · "}
+              Published {new Date(latestRelease.publishedAt).toLocaleDateString()}
+            </p>
+          )}
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handlePublish} className="grid gap-4 max-w-lg">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="release-version">Version number</Label>
+                <Input
+                  id="release-version"
+                  placeholder="e.g. 0.2.0"
+                  value={newVersion}
+                  onChange={(e) => setNewVersion(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="release-url">Download URL</Label>
+                <Input
+                  id="release-url"
+                  placeholder="https://..."
+                  value={newDownloadUrl}
+                  onChange={(e) => setNewDownloadUrl(e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="release-notes">Release notes</Label>
+              <Textarea
+                id="release-notes"
+                placeholder="What's new in this version..."
+                value={newReleaseNotes}
+                onChange={(e) => setNewReleaseNotes(e.target.value)}
+                rows={3}
+              />
+            </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="notify-users"
+                checked={notifyUsers}
+                onCheckedChange={(checked) => setNotifyUsers(checked === true)}
+              />
+              <Label htmlFor="notify-users" className="text-sm font-normal cursor-pointer">
+                Notify all desktop users about this update
+              </Label>
+            </div>
+            <Button type="submit" disabled={isPublishing} className="w-fit">
+              {isPublishing && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Publish Version
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
     </div>
   );
 };
