@@ -1,32 +1,30 @@
 
 
-# Restrict "Publish New Version" Panel to Developers
+## Neater Release Notes Display
 
-## Approach
-Add a `role` distinction to `admin_profiles`. Currently all admins have `role = 'admin'`. We'll support an additional value `'developer'`. Only admins with `role = 'developer'` will see the "Publish New Version" panel — all other admins see the download card and setup guide as usual.
+Right now the release notes dump as a single `whitespace-pre-line` text block inside the download card, which makes it long and hard to scan (as seen in the screenshot). The content has clear structure — a title line, "Added" items, "Improved" items, and "Known Requirements" — that can be parsed and rendered nicely.
 
-This is lightweight: one column already exists (`role` on `admin_profiles`, defaulting to `'admin'`), so we just need to allow a second value and gate the UI.
+### Approach
 
-## Changes
+Move the release notes out of the download card into a collapsible accordion below the two-column grid. Parse the raw text into structured sections and render them with proper formatting:
 
-### 1. Database
-- No schema change needed — `admin_profiles.role` is already a `text` column defaulting to `'admin'`. We simply store `'developer'` for privileged admins.
-- To promote an admin, run: `UPDATE admin_profiles SET role = 'developer' WHERE email = '...'` (or build a UI later).
+1. **Move release notes to a standalone collapsible card** below the download/setup grid using the existing `Collapsible` or `Accordion` component. Default state: collapsed, showing just "What's new in v0.2.0" as a clickable header.
 
-### 2. Admin Context (`src/context/AdminContext.tsx`)
-- Fetch the current admin's `role` from `admin_profiles` after login.
-- Expose `adminRole` (string) on the context so components can check it.
+2. **Parse the release notes text** into sections by splitting on known headings ("Known Requirements", etc.) and bullet-style lines (lines starting with "Added", "Improved", "Fixed", "Removed"):
+   - Title line → card header subtitle
+   - "Added …" / "Improved …" lines → rendered as a bulleted list with category badges
+   - "Known Requirements" block → separate styled callout
 
-### 3. Desktop App page (`src/components/dashboard/DesktopApp.tsx`)
-- Read `adminRole` from context.
-- Conditionally render the "Publish New Version" card only when `adminRole === 'developer'`.
+3. **Visual treatment**:
+   - Each changelog line gets a small colored badge: green for "Added", blue for "Improved", yellow for "Fixed"
+   - Known Requirements section gets an info-style callout (like the existing Tip box)
+   - The whole section stays compact when collapsed — one line with a chevron
 
-### 4. Edge Function (`app-releases` POST)
-- Add a server-side check: verify the calling admin's profile has `role = 'developer'` before allowing a publish. Return 403 otherwise.
+### Files changed
 
-## What regular admins see
-The download card, setup guide, and tip — exactly as before, minus the publish form.
+- `src/components/dashboard/DesktopApp.tsx` — remove inline release notes block from the download card, add a new collapsible release notes section below the grid with structured parsing and rendering.
 
-## What developers see
-Everything above, plus the "Publish New Version" panel at the bottom.
+### Result
+
+The download card stays clean and focused on the download button + feature highlights. Release notes are accessible but don't dominate the page. Structured formatting makes them scannable at a glance.
 
