@@ -485,6 +485,21 @@ const Desktop = () => {
     };
   }, [sessionUser]);
 
+  // Native host bridge: listen for toast confirm events from Windows app
+  useEffect(() => {
+    if (!sessionUser) return;
+
+    const handler = (event: Event) => {
+      const detail = (event as CustomEvent<{ alertId: string }>).detail;
+      if (detail?.alertId) {
+        void handleAcknowledge(detail.alertId);
+      }
+    };
+
+    window.addEventListener("desktop-host-confirm-alert", handler);
+    return () => window.removeEventListener("desktop-host-confirm-alert", handler);
+  }, [sessionUser]);
+
   // Polling fallback
   useEffect(() => {
     if (!sessionUser) return;
