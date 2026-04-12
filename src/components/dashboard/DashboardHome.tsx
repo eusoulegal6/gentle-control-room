@@ -92,7 +92,7 @@ const DashboardHome = () => {
             <div className="space-y-3">
               {alerts.slice(0, 5).map((alert) => (
                 <div key={alert.id} className="flex items-start justify-between gap-4 p-3 rounded-lg bg-muted/50">
-                  <div className="min-w-0 flex-1">
+                  <div className="min-w-0 flex-1 overflow-hidden">
                     <div className="flex items-center gap-2">
                       <p className="text-sm font-medium">To: {alert.recipientUsername}</p>
                       {onlineUserIds.has(alert.recipientId ?? "") && (
