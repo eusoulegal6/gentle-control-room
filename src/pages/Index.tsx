@@ -313,11 +313,9 @@ const Index = () => {
                     Open Dashboard <ArrowRight className="w-4 h-4" />
                   </Button>
                 </Link>
-                <a href="#download">
-                  <Button size="lg" variant="outline" className="gap-2">
-                    <Download className="w-4 h-4" /> Download App
-                  </Button>
-                </a>
+                <Button size="lg" variant="outline" className="gap-2" onClick={() => setDemoOpen(true)}>
+                  <Play className="w-4 h-4" /> Watch Demo
+                </Button>
                 <Button size="lg" variant="outline" className="gap-2" onClick={() => setDemoOpen(true)}>
                   <Play className="w-4 h-4" /> Watch Demo
                 </Button>
