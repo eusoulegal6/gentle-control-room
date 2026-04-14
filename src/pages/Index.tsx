@@ -632,15 +632,21 @@ const Index = () => {
 
       {/* Demo Video Dialog */}
       <Dialog open={demoOpen} onOpenChange={setDemoOpen}>
-        <DialogContent className="sm:max-w-4xl p-0 overflow-hidden bg-background/95 backdrop-blur">
-          <DialogHeader className="p-4 pb-0 border-b-0">
-            <DialogTitle className="flex items-center gap-2 text-base">
-              <Play className="w-4 h-4 text-primary" />
-              Gentle Control Room — Demo
-            </DialogTitle>
+        <DialogContent className="sm:max-w-3xl p-0 overflow-hidden">
+          <DialogHeader className="p-6 pb-0">
+            <DialogTitle>Gentle Control Room — Demo</DialogTitle>
           </DialogHeader>
-          <div className="p-4 pt-3">
-            <VideoPlayer isOpen={demoOpen} />
+          <div className="p-6 pt-4">
+            <div className="rounded-xl overflow-hidden bg-black aspect-video">
+              {demoOpen && (
+                <video
+                  src="/demo.mp4"
+                  controls
+                  autoPlay
+                  className="w-full h-full object-contain relative z-10"
+                />
+              )}
+            </div>
           </div>
         </DialogContent>
       </Dialog>
@@ -648,13 +654,7 @@ const Index = () => {
   );
 };
 
-/* ------------------------------------------------------------------ */
-/*  Custom Video Player with enhanced controls                         */
-/* ------------------------------------------------------------------ */
-interface VideoPlayerProps {
-  isOpen: boolean;
-}
-
+export default Index;
 const VideoPlayer = ({ isOpen }: VideoPlayerProps) => {
   const videoRef = React.useRef<HTMLVideoElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
