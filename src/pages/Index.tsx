@@ -255,6 +255,8 @@ const steps = [
 ];
 
 const Index = () => {
+  const [demoOpen, setDemoOpen] = useState(false);
+
   return (
     <div className="min-h-screen bg-background">
       {/* -------- NAVBAR -------- */}
