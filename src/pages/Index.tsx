@@ -317,8 +317,6 @@ const Index = () => {
                   <Play className="w-4 h-4" /> Watch Demo
                 </Button>
               </div>
-                </Button>
-              </div>
 
               <div className="flex items-center gap-6 pt-4 text-sm text-muted-foreground">
                 {["Free to use", "No ads", "Self-hosted"].map((t) => (
