@@ -15,7 +15,14 @@ import {
   LogIn,
   KeyRound,
   UserPlus,
+  Play,
 } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 
@@ -248,6 +255,8 @@ const steps = [
 ];
 
 const Index = () => {
+  const [demoOpen, setDemoOpen] = useState(false);
+
   return (
     <div className="min-h-screen bg-background">
       {/* -------- NAVBAR -------- */}
@@ -309,6 +318,9 @@ const Index = () => {
                     <Download className="w-4 h-4" /> Download App
                   </Button>
                 </a>
+                <Button size="lg" variant="outline" className="gap-2" onClick={() => setDemoOpen(true)}>
+                  <Play className="w-4 h-4" /> Watch Demo
+                </Button>
               </div>
 
               <div className="flex items-center gap-6 pt-4 text-sm text-muted-foreground">
@@ -617,6 +629,27 @@ const Index = () => {
           <p>&copy; {new Date().getFullYear()} All rights reserved.</p>
         </div>
       </footer>
+
+      {/* Demo Video Dialog */}
+      <Dialog open={demoOpen} onOpenChange={setDemoOpen}>
+        <DialogContent className="sm:max-w-3xl p-0 overflow-hidden">
+          <DialogHeader className="p-6 pb-0">
+            <DialogTitle>Gentle Control Room — Demo</DialogTitle>
+          </DialogHeader>
+          <div className="p-6 pt-4">
+            <div className="rounded-xl overflow-hidden bg-black aspect-video">
+              {demoOpen && (
+                <video
+                  src="/demo.mp4"
+                  controls
+                  autoPlay
+                  className="w-full h-full object-contain"
+                />
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
