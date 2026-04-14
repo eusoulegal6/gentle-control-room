@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import * as React from "react";
 import { Link } from "react-router-dom";
 import {
   Bell,
@@ -16,6 +17,10 @@ import {
   KeyRound,
   UserPlus,
   Play,
+  Pause,
+  Undo2,
+  Redo2,
+  Volume2,
 } from "lucide-react";
 import {
   Dialog,
