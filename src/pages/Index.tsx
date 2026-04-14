@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import * as React from "react";
 import { Link } from "react-router-dom";
 import {
   Bell,
@@ -17,10 +16,6 @@ import {
   KeyRound,
   UserPlus,
   Play,
-  Pause,
-  Undo2,
-  Redo2,
-  Volume2,
 } from "lucide-react";
 import {
   Dialog,
@@ -632,202 +627,24 @@ const Index = () => {
 
       {/* Demo Video Dialog */}
       <Dialog open={demoOpen} onOpenChange={setDemoOpen}>
-        <DialogContent className="sm:max-w-4xl p-0 overflow-hidden bg-background/95 backdrop-blur">
-          <DialogHeader className="p-4 pb-0 border-b-0">
-            <DialogTitle className="flex items-center gap-2 text-base">
-              <Play className="w-4 h-4 text-primary" />
-              Gentle Control Room — Demo
-            </DialogTitle>
+        <DialogContent className="sm:max-w-3xl p-0 overflow-hidden">
+          <DialogHeader className="p-6 pb-0">
+            <DialogTitle>Gentle Control Room — Demo</DialogTitle>
           </DialogHeader>
-          <div className="p-4 pt-3">
-            <VideoPlayer isOpen={demoOpen} />
+          <div className="p-6 pt-4">
+            <div className="rounded-xl overflow-hidden bg-black aspect-video">
+              {demoOpen && (
+                <video
+                  src="/demo.mp4"
+                  controls
+                  autoPlay
+                  className="w-full h-full object-contain relative z-10"
+                />
+              )}
+            </div>
           </div>
         </DialogContent>
       </Dialog>
-    </div>
-  );
-};
-
-/* ------------------------------------------------------------------ */
-/*  Custom Video Player with enhanced controls                         */
-/* ------------------------------------------------------------------ */
-interface VideoPlayerProps {
-  isOpen: boolean;
-}
-
-const VideoPlayer = ({ isOpen }: VideoPlayerProps) => {
-  const videoRef = React.useRef<HTMLVideoElement>(null);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [duration, setDuration] = useState(0);
-  const [showControls, setShowControls] = useState(true);
-  const controlsTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
-
-  useEffect(() => {
-    if (!isOpen) {
-      setIsPlaying(false);
-      setProgress(0);
-    }
-  }, [isOpen]);
-
-  const togglePlay = () => {
-    if (videoRef.current) {
-      if (isPlaying) {
-        videoRef.current.pause();
-      } else {
-        videoRef.current.play();
-      }
-    }
-  };
-
-  const seek = (seconds: number) => {
-    if (videoRef.current) {
-      videoRef.current.currentTime = Math.max(
-        0,
-        Math.min(duration, videoRef.current.currentTime + seconds)
-      );
-    }
-  };
-
-  const handleSeek = (value: number[]) => {
-    if (videoRef.current) {
-      const newTime = (value[0] / 100) * duration;
-      videoRef.current.currentTime = newTime;
-    }
-  };
-
-  const onTimeUpdate = () => {
-    if (videoRef.current) {
-      setProgress((videoRef.current.currentTime / duration) * 100);
-    }
-  };
-
-  const onLoadedMetadata = () => {
-    if (videoRef.current) {
-      setDuration(videoRef.current.duration);
-      videoRef.current.play();
-    }
-  };
-
-  const showControlsTemporarily = () => {
-    setShowControls(true);
-    if (controlsTimeoutRef.current) {
-      clearTimeout(controlsTimeoutRef.current);
-    }
-    if (isPlaying) {
-      controlsTimeoutRef.current = setTimeout(() => setShowControls(false), 2000);
-    }
-  };
-
-  const formatTime = (time: number) => {
-    const minutes = Math.floor(time / 60);
-    const seconds = Math.floor(time % 60);
-    return `${minutes}:${seconds.toString().padStart(2, "0")}`;
-  };
-
-  return (
-    <div 
-      className="relative rounded-xl overflow-hidden bg-black aspect-video group"
-      onMouseMove={showControlsTemporarily}
-      onMouseLeave={() => isPlaying && setShowControls(false)}
-    >
-      {isOpen && (
-        <video
-          ref={videoRef}
-          src="/demo.mp4"
-          className="w-full h-full object-contain cursor-pointer"
-          onClick={togglePlay}
-          onPlay={() => setIsPlaying(true)}
-          onPause={() => setIsPlaying(false)}
-          onTimeUpdate={onTimeUpdate}
-          onLoadedMetadata={onLoadedMetadata}
-          onEnded={() => setIsPlaying(false)}
-        />
-      )}
-
-      {/* Play/Pause Overlay */}
-      {!isPlaying && (
-        <button
-          onClick={togglePlay}
-          className="absolute inset-0 flex items-center justify-center bg-black/40 transition-opacity hover:bg-black/50"
-        >
-          <div className="w-16 h-16 rounded-full gradient-primary flex items-center justify-center shadow-lg">
-            <Play className="w-6 h-6 text-primary-foreground ml-1" />
-          </div>
-        </button>
-      )}
-
-      {/* Custom Controls */}
-      <div 
-        className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/60 to-transparent p-4 transition-opacity duration-300 ${
-          showControls || !isPlaying ? "opacity-100" : "opacity-0"
-        }`}
-      >
-        {/* Progress Slider */}
-        <div className="mb-3">
-          <input
-            type="range"
-            min="0"
-            max="100"
-            value={progress}
-            onChange={(e) => handleSeek([parseFloat(e.target.value)])}
-            className="w-full h-1.5 bg-white/30 rounded-full appearance-none cursor-pointer accent-primary hover:accent-primary/80 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary [&::-webkit-slider-thumb]:cursor-pointer"
-            style={{
-              background: `linear-gradient(to right, hsl(221, 83%, 53%) ${progress}%, rgba(255,255,255,0.3) ${progress}%)`
-            }}
-          />
-        </div>
-
-        {/* Control Buttons */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <button
-              onClick={togglePlay}
-              className="w-9 h-9 rounded-lg bg-white/20 hover:bg-white/30 flex items-center justify-center transition-colors"
-            >
-              {isPlaying ? (
-                <Pause className="w-4 h-4 text-white" />
-              ) : (
-                <Play className="w-4 h-4 text-white ml-0.5" />
-              )}
-            </button>
-            
-            <div className="flex items-center gap-1 ml-2">
-              <button
-                onClick={() => seek(-10)}
-                className="w-8 h-8 rounded-lg hover:bg-white/10 flex items-center justify-center transition-colors group"
-                title="Back 10 seconds"
-              >
-                <Undo2 className="w-4 h-4 text-white/80 group-hover:text-white" />
-                <span className="text-[9px] text-white/80 absolute mt-3">10</span>
-              </button>
-              <button
-                onClick={() => seek(10)}
-                className="w-8 h-8 rounded-lg hover:bg-white/10 flex items-center justify-center transition-colors group"
-                title="Forward 10 seconds"
-              >
-                <Redo2 className="w-4 h-4 text-white/80 group-hover:text-white" />
-                <span className="text-[9px] text-white/80 absolute mt-3">10</span>
-              </button>
-            </div>
-
-            <span className="text-white/80 text-xs ml-3 font-mono">
-              {formatTime(videoRef.current?.currentTime || 0)} / {formatTime(duration)}
-            </span>
-          </div>
-
-          <button
-            onClick={() => {
-              if (videoRef.current) {
-                videoRef.current.muted = !videoRef.current.muted;
-              }
-            }}
-            className="w-8 h-8 rounded-lg hover:bg-white/10 flex items-center justify-center transition-colors"
-          >
-            <Volume2 className="w-4 h-4 text-white/80 hover:text-white" />
-          </button>
-        </div>
-      </div>
     </div>
   );
 };
