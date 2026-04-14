@@ -654,8 +654,6 @@ const Index = () => {
   );
 };
 
-export default Index;
-const VideoPlayer = ({ isOpen }: VideoPlayerProps) => {
   const videoRef = React.useRef<HTMLVideoElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
