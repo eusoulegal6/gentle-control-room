@@ -629,6 +629,27 @@ const Index = () => {
           <p>&copy; {new Date().getFullYear()} All rights reserved.</p>
         </div>
       </footer>
+
+      {/* Demo Video Dialog */}
+      <Dialog open={demoOpen} onOpenChange={setDemoOpen}>
+        <DialogContent className="sm:max-w-3xl p-0 overflow-hidden">
+          <DialogHeader className="p-6 pb-0">
+            <DialogTitle>Gentle Control Room — Demo</DialogTitle>
+          </DialogHeader>
+          <div className="p-6 pt-4">
+            <div className="rounded-xl overflow-hidden bg-black aspect-video">
+              {demoOpen && (
+                <video
+                  src="/demo.mp4"
+                  controls
+                  autoPlay
+                  className="w-full h-full object-contain"
+                />
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
