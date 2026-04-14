@@ -318,6 +318,9 @@ const Index = () => {
                     <Download className="w-4 h-4" /> Download App
                   </Button>
                 </a>
+                <Button size="lg" variant="outline" className="gap-2" onClick={() => setDemoOpen(true)}>
+                  <Play className="w-4 h-4" /> Watch Demo
+                </Button>
               </div>
 
               <div className="flex items-center gap-6 pt-4 text-sm text-muted-foreground">
