@@ -18,12 +18,6 @@ import {
   Play,
   X,
 } from "lucide-react";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 
@@ -644,7 +638,7 @@ const Index = () => {
             <div className="p-6 pt-4">
               <div className="rounded-xl overflow-hidden bg-black aspect-video">
                 <video
-                  src="/demo.mp4"
+                  src="https://ipwmfdsnzjhzeofwwptk.supabase.co/storage/v1/object/public/downloads/demo.mp4"
                   controls
                   autoPlay
                   playsInline
