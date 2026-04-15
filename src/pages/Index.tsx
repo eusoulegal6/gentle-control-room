@@ -16,6 +16,7 @@ import {
   KeyRound,
   UserPlus,
   Play,
+  X,
 } from "lucide-react";
 import {
   Dialog,
@@ -626,17 +627,22 @@ const Index = () => {
       </footer>
 
       {/* Demo Video Dialog */}
-      <Dialog open={demoOpen} onOpenChange={setDemoOpen}>
-        <DialogContent
-          className="sm:max-w-3xl h-fit p-0 overflow-hidden inset-0 my-auto translate-x-0 translate-y-0 data-[state=closed]:slide-out-to-left-0 data-[state=closed]:slide-out-to-top-0 data-[state=open]:slide-in-from-left-0 data-[state=open]:slide-in-from-top-0 data-[state=closed]:zoom-out-100 data-[state=open]:zoom-in-100"
-          style={{ transform: "none" }}
-        >
-          <DialogHeader className="p-6 pb-0">
-            <DialogTitle>Gentle Control Room — Demo</DialogTitle>
-          </DialogHeader>
-          <div className="p-6 pt-4">
-            <div className="rounded-xl overflow-hidden bg-black aspect-video">
-              {demoOpen && (
+      {demoOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="fixed inset-0 bg-black/80" onClick={() => setDemoOpen(false)} />
+          <div className="relative z-10 w-full max-w-3xl mx-4 bg-background border rounded-lg shadow-lg">
+            <div className="p-6 pb-0 flex items-center justify-between">
+              <h2 className="text-lg font-semibold">Gentle Control Room — Demo</h2>
+              <button
+                onClick={() => setDemoOpen(false)}
+                className="rounded-sm opacity-70 hover:opacity-100 transition-opacity"
+              >
+                <X className="h-4 w-4" />
+                <span className="sr-only">Close</span>
+              </button>
+            </div>
+            <div className="p-6 pt-4">
+              <div className="rounded-xl overflow-hidden bg-black aspect-video">
                 <video
                   src="/demo.mp4"
                   controls
@@ -644,11 +650,11 @@ const Index = () => {
                   playsInline
                   className="block w-full h-full object-contain"
                 />
-              )}
+              </div>
             </div>
           </div>
-        </DialogContent>
-      </Dialog>
+        </div>
+      )}
     </div>
   );
 };
