@@ -23,7 +23,7 @@ function parseReleaseNotes(raw: string): ParsedNotes {
   let inKnown = false;
   for (const line of lines) {
     // Skip the title line (e.g. "Gentle Control Room Desktop v0.2.0")
-    if (/^gentle control room/i.test(line)) continue;
+    if (/^emergency staff alert/i.test(line)) continue;
 
     if (/^known requirements$/i.test(line)) {
       inKnown = true;
