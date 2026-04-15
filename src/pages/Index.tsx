@@ -627,7 +627,10 @@ const Index = () => {
 
       {/* Demo Video Dialog */}
       <Dialog open={demoOpen} onOpenChange={setDemoOpen}>
-        <DialogContent className="sm:max-w-3xl p-0 overflow-hidden">
+        <DialogContent
+          className="sm:max-w-3xl h-fit p-0 overflow-hidden inset-0 my-auto translate-x-0 translate-y-0 data-[state=closed]:slide-out-to-left-0 data-[state=closed]:slide-out-to-top-0 data-[state=open]:slide-in-from-left-0 data-[state=open]:slide-in-from-top-0 data-[state=closed]:zoom-out-100 data-[state=open]:zoom-in-100"
+          style={{ transform: "none" }}
+        >
           <DialogHeader className="p-6 pb-0">
             <DialogTitle>Gentle Control Room — Demo</DialogTitle>
           </DialogHeader>
@@ -638,7 +641,8 @@ const Index = () => {
                   src="/demo.mp4"
                   controls
                   autoPlay
-                  className="w-full h-full object-contain relative z-10"
+                  playsInline
+                  className="block w-full h-full object-contain"
                 />
               )}
             </div>
