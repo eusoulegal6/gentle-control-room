@@ -1,6 +1,7 @@
-import { LayoutDashboard, Users, Send, History, Shield, Monitor, FolderOpen } from "lucide-react";
+import { LayoutDashboard, Users, Send, History, Shield, Monitor, FolderOpen, Crown } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
+import { useAdmin } from "@/context/AdminContext";
 import {
   Sidebar,
   SidebarContent,
@@ -21,10 +22,15 @@ const items = [
   { title: "Desktop App", url: "/dashboard/desktop-app", icon: Monitor },
 ];
 
+const superAdminItem = { title: "Super Admin", url: "/dashboard/super-admin", icon: Crown };
+
 export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
   const location = useLocation();
+  const { adminRole } = useAdmin();
+
+  const navItems = adminRole === "super_admin" ? [...items, superAdminItem] : items;
 
   return (
     <Sidebar collapsible="icon">
