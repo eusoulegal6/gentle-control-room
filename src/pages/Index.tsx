@@ -16,6 +16,7 @@ import {
   KeyRound,
   UserPlus,
   Play,
+  X,
 } from "lucide-react";
 import {
   Dialog,
