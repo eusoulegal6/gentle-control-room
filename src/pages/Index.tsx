@@ -108,7 +108,7 @@ const DashboardPreview = () => (
         <span className="w-3 h-3 rounded-full bg-success/70" />
       </div>
       <span className="text-xs text-sidebar-foreground ml-2 font-medium">
-        Gentle Control Room — Dashboard
+        Emergency Staff Alert — Dashboard
       </span>
     </div>
 
@@ -261,7 +261,7 @@ const Index = () => {
             <div className="w-8 h-8 rounded-lg gradient-primary flex items-center justify-center">
               <Shield className="w-4 h-4 text-primary-foreground" />
             </div>
-            <span className="font-bold text-foreground text-lg">Gentle Control Room</span>
+            <span className="font-bold text-foreground text-lg">Emergency Staff Alert</span>
           </div>
           <div className="flex items-center gap-3">
             <Link to="/login">
@@ -458,7 +458,7 @@ const Index = () => {
                       <Monitor className="w-8 h-8 text-primary-foreground" />
                     </div>
                     <h3 className="text-xl font-bold text-primary-foreground">
-                      Gentle Control Room for Windows
+                      Emergency Staff Alert for Windows
                     </h3>
                     <p className="text-primary-foreground/80 text-sm">
                       Version 0.1.0 · Windows 10/11 (x64)
@@ -614,7 +614,7 @@ const Index = () => {
             <div className="w-6 h-6 rounded-md gradient-primary flex items-center justify-center">
               <Shield className="w-3 h-3 text-primary-foreground" />
             </div>
-            <span className="font-medium text-foreground">Gentle Control Room</span>
+            <span className="font-medium text-foreground">Emergency Staff Alert</span>
           </div>
           <p>&copy; {new Date().getFullYear()} All rights reserved.</p>
         </div>
@@ -626,7 +626,7 @@ const Index = () => {
           <div className="fixed inset-0 bg-black/80" onClick={() => setDemoOpen(false)} />
           <div className="relative z-10 w-full max-w-3xl mx-4 bg-background border rounded-lg shadow-lg">
             <div className="p-6 pb-0 flex items-center justify-between">
-              <h2 className="text-lg font-semibold">Gentle Control Room — Demo</h2>
+              <h2 className="text-lg font-semibold">Emergency Staff Alert — Demo</h2>
               <button
                 onClick={() => setDemoOpen(false)}
                 className="rounded-sm opacity-70 hover:opacity-100 transition-opacity"

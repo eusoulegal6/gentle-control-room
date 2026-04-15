@@ -142,7 +142,7 @@ const DesktopApp = () => {
                 <Monitor className="w-8 h-8 text-primary-foreground" />
               </div>
               <h3 className="text-xl font-bold text-primary-foreground">
-                Gentle Control Room for Windows
+                Emergency Staff Alert for Windows
               </h3>
               <p className="text-primary-foreground/80 text-sm">
                 {isLoadingRelease ? "Loading..." : `Version ${displayVersion} · Windows 10/11 (x64)`}
