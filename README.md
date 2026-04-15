@@ -1,4 +1,4 @@
-# Gentle Control Room
+# Emergency Staff Alert
 
 Frontend:
 - `npm run dev` starts the Vite dashboard on port `8080`.
