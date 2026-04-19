@@ -10,14 +10,19 @@ import { Separator } from "@/components/ui/separator";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 const Login = () => {
-  const { login, register } = useAdmin();
+  const { login, verifyMfa, register } = useAdmin();
   const [isRegister, setIsRegister] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
+  const [info, setInfo] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+
+  // MFA step state
+  const [mfaChallengeId, setMfaChallengeId] = useState<string | null>(null);
+  const [mfaCode, setMfaCode] = useState("");
 
   const handleGoogleSignIn = async () => {
     setError("");
@@ -40,6 +45,7 @@ const Login = () => {
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError("");
+    setInfo("");
 
     if (!email.trim() || !password) {
       setError("Please fill in all fields.");
@@ -57,13 +63,45 @@ const Login = () => {
       if (isRegister) {
         await register(email.trim(), password);
       } else {
-        await login(email.trim(), password);
+        const result = await login(email.trim(), password);
+        if (result.kind === "mfa_required") {
+          setMfaChallengeId(result.challengeId);
+          setInfo(
+            result.emailDeliveryWarning
+              ? `Code generated. Email delivery issue: ${result.emailDeliveryWarning}. Check edge function logs for the code.`
+              : `We sent a 6-digit verification code to ${email.trim()}.`,
+          );
+        }
       }
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : "Unable to complete authentication.");
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleVerifyMfa = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setError("");
+    if (!mfaChallengeId || mfaCode.trim().length !== 6) {
+      setError("Enter the 6-digit code.");
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      await verifyMfa(mfaChallengeId, mfaCode.trim(), email.trim(), password);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Verification failed.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleCancelMfa = () => {
+    setMfaChallengeId(null);
+    setMfaCode("");
+    setInfo("");
+    setError("");
   };
 
   return (
