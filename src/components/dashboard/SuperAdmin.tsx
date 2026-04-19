@@ -124,8 +124,11 @@ const SuperAdmin = () => {
   };
 
   useEffect(() => {
-    if (adminRole === "super_admin") loadData();
-  }, [adminRole, loadData]);
+    if (adminRole === "super_admin") {
+      loadData();
+      loadMfa();
+    }
+  }, [adminRole, loadData, loadMfa]);
 
   const handleSaveRole = async (id: string) => {
     try {
@@ -173,6 +176,34 @@ const SuperAdmin = () => {
           <p className="text-sm text-muted-foreground">Platform administration & user management</p>
         </div>
       </div>
+
+      {/* Two-step verification (per-admin) */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <KeyRound className="w-4 h-4" /> Two-Step Verification
+          </CardTitle>
+          <CardDescription>
+            Optional. When enabled, signing in to the admin dashboard requires a 6-digit code sent to your email.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-between rounded-lg border p-4">
+            <div className="space-y-1">
+              <Label htmlFor="mfa-toggle" className="text-base">Require email code on sign-in</Label>
+              <p className="text-xs text-muted-foreground">
+                Applies to your admin account only. Staff/desktop logins are not affected.
+              </p>
+            </div>
+            <Switch
+              id="mfa-toggle"
+              checked={mfaEnabled}
+              disabled={mfaLoading}
+              onCheckedChange={toggleMfa}
+            />
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Signup Stats */}
       <Card>
