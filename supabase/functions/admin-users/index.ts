@@ -111,7 +111,12 @@ Deno.serve(async (req) => {
     // CREATE
     if (req.method === "POST") {
       const body = await req.json();
-      const { username, password, displayName } = body;
+      const rawUsername = typeof body.username === "string" ? body.username : "";
+      const password = typeof body.password === "string" ? body.password : "";
+      const displayName = body.displayName;
+
+      const username = rawUsername.trim().toLowerCase();
+      const EMAIL_RE = /^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$/;
 
       if (!username || !password) {
         return new Response(JSON.stringify({ error: "Username and password are required" }), {
@@ -120,14 +125,22 @@ Deno.serve(async (req) => {
         });
       }
 
+      if (!EMAIL_RE.test(username)) {
+        return new Response(JSON.stringify({ error: "Username must be in email format (e.g. name@example.com). It does not need to be a real email." }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // Case-insensitive duplicate check across the entire database
       const { data: existing } = await supabase
         .from("desktop_users")
         .select("id")
-        .eq("username", username)
+        .ilike("username", username)
         .maybeSingle();
 
       if (existing) {
-        return new Response(JSON.stringify({ error: "Username already exists" }), {
+        return new Response(JSON.stringify({ error: "A staff account with this username already exists." }), {
           status: 409,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -147,7 +160,17 @@ Deno.serve(async (req) => {
         .select("id, username, display_name, status, created_at, updated_at")
         .single();
 
-      if (error) throw error;
+      if (error) {
+        // Map unique-constraint violations to a friendly 409
+        const msg = error.message || "";
+        if (msg.toLowerCase().includes("duplicate") || msg.toLowerCase().includes("unique")) {
+          return new Response(JSON.stringify({ error: "A staff account with this username already exists." }), {
+            status: 409,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        throw error;
+      }
 
       return new Response(
         JSON.stringify({
@@ -176,8 +199,31 @@ Deno.serve(async (req) => {
 
       const body = await req.json();
       const updates: Record<string, unknown> = {};
+      const EMAIL_RE = /^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$/;
 
-      if (body.username !== undefined) updates.username = body.username;
+      if (body.username !== undefined) {
+        const newUsername = String(body.username).trim().toLowerCase();
+        if (!EMAIL_RE.test(newUsername)) {
+          return new Response(JSON.stringify({ error: "Username must be in email format (e.g. name@example.com)." }), {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        // Check uniqueness excluding the current user
+        const { data: dup } = await supabase
+          .from("desktop_users")
+          .select("id")
+          .ilike("username", newUsername)
+          .neq("id", userId)
+          .maybeSingle();
+        if (dup) {
+          return new Response(JSON.stringify({ error: "A staff account with this username already exists." }), {
+            status: 409,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        updates.username = newUsername;
+      }
       if (body.displayName !== undefined) updates.display_name = body.displayName;
       if (body.status !== undefined) updates.status = body.status;
       if (body.password) {
@@ -191,7 +237,16 @@ Deno.serve(async (req) => {
         .select("id, username, display_name, status, created_at, updated_at")
         .single();
 
-      if (error) throw error;
+      if (error) {
+        const msg = error.message || "";
+        if (msg.toLowerCase().includes("duplicate") || msg.toLowerCase().includes("unique")) {
+          return new Response(JSON.stringify({ error: "A staff account with this username already exists." }), {
+            status: 409,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        throw error;
+      }
 
       const { count } = await supabase
         .from("alerts")

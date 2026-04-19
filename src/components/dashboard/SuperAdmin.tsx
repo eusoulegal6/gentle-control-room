@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Shield, UserCog, BarChart3, Pencil, Trash2, Save, X } from "lucide-react";
+import { Shield, UserCog, BarChart3, Pencil, Trash2, Save, X, KeyRound } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAdmin } from "@/context/AdminContext";
 import { Button } from "@/components/ui/button";
@@ -7,6 +7,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 
 interface AdminProfile {
@@ -52,6 +54,10 @@ const SuperAdmin = () => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editRole, setEditRole] = useState("");
 
+  // 2FA state for the current admin
+  const [mfaEnabled, setMfaEnabled] = useState(false);
+  const [mfaLoading, setMfaLoading] = useState(false);
+
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
@@ -68,9 +74,61 @@ const SuperAdmin = () => {
     }
   }, [toast]);
 
+  const loadMfa = useCallback(async () => {
+    try {
+      const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      const res = await fetch(`https://${projectId}.supabase.co/functions/v1/admin-mfa/settings`, {
+        headers: {
+          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
+      const data = await res.json();
+      if (res.ok) setMfaEnabled(!!data.enabled);
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  const toggleMfa = async (next: boolean) => {
+    setMfaLoading(true);
+    try {
+      const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Not signed in.");
+      const res = await fetch(`https://${projectId}.supabase.co/functions/v1/admin-mfa/settings`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ enabled: next }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || "Failed to update.");
+      setMfaEnabled(!!data.enabled);
+      toast({
+        title: next ? "Two-step verification enabled" : "Two-step verification disabled",
+        description: next
+          ? "You'll be asked for an email code on your next sign-in."
+          : "Future sign-ins will use password only.",
+      });
+    } catch (e) {
+      toast({ title: "Error", description: e instanceof Error ? e.message : "Failed", variant: "destructive" });
+    } finally {
+      setMfaLoading(false);
+    }
+  };
+
   useEffect(() => {
-    if (adminRole === "super_admin") loadData();
-  }, [adminRole, loadData]);
+    if (adminRole === "super_admin") {
+      loadData();
+      loadMfa();
+    }
+  }, [adminRole, loadData, loadMfa]);
 
   const handleSaveRole = async (id: string) => {
     try {
@@ -118,6 +176,34 @@ const SuperAdmin = () => {
           <p className="text-sm text-muted-foreground">Platform administration & user management</p>
         </div>
       </div>
+
+      {/* Two-step verification (per-admin) */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <KeyRound className="w-4 h-4" /> Two-Step Verification
+          </CardTitle>
+          <CardDescription>
+            Optional. When enabled, signing in to the admin dashboard requires a 6-digit code sent to your email.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-between rounded-lg border p-4">
+            <div className="space-y-1">
+              <Label htmlFor="mfa-toggle" className="text-base">Require email code on sign-in</Label>
+              <p className="text-xs text-muted-foreground">
+                Applies to your admin account only. Staff/desktop logins are not affected.
+              </p>
+            </div>
+            <Switch
+              id="mfa-toggle"
+              checked={mfaEnabled}
+              disabled={mfaLoading}
+              onCheckedChange={toggleMfa}
+            />
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Signup Stats */}
       <Card>

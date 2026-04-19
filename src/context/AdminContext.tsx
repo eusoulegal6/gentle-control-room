@@ -26,6 +26,10 @@ export interface Alert {
   acknowledgedAt: string | null;
 }
 
+export type LoginResult =
+  | { kind: "signed_in" }
+  | { kind: "mfa_required"; challengeId: string; email: string; password: string; emailDeliveryWarning: string | null };
+
 interface AdminContextType {
   isReady: boolean;
   isLoggedIn: boolean;
@@ -33,7 +37,8 @@ interface AdminContextType {
   adminRole: string;
   users: AppUser[];
   alerts: Alert[];
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<LoginResult>;
+  verifyMfa: (challengeId: string, code: string, email: string, password: string) => Promise<void>;
   register: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   addUser: (username: string, password: string, displayName?: string | null) => Promise<void>;
@@ -124,9 +129,62 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setAlerts(alertsPayload.alerts);
   }, []);
 
-  const login = useCallback(async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+  const login = useCallback(async (email: string, password: string): Promise<LoginResult> => {
+    const { data: signIn, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw new Error(error.message);
+    const userId = signIn.user?.id;
+    if (!userId) throw new Error("Sign-in failed.");
+
+    const { data: mfa } = await supabase
+      .from("admin_mfa_settings")
+      .select("enabled")
+      .eq("admin_id", userId)
+      .maybeSingle();
+
+    if (!mfa?.enabled) {
+      return { kind: "signed_in" };
+    }
+
+    // MFA enabled — sign out and request a challenge via the edge function
+    await supabase.auth.signOut();
+
+    const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+    const res = await fetch(`https://${projectId}.supabase.co/functions/v1/admin-mfa/challenge`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+      },
+      body: JSON.stringify({ email, password }),
+    });
+    const payload = await res.json();
+    if (!res.ok) throw new Error(payload?.error || "Could not start verification.");
+    return {
+      kind: "mfa_required",
+      challengeId: payload.challengeId,
+      email,
+      password,
+      emailDeliveryWarning: payload.emailDeliveryWarning ?? null,
+    };
+  }, []);
+
+  const verifyMfa = useCallback(async (challengeId: string, code: string, email: string, password: string) => {
+    const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+    const res = await fetch(`https://${projectId}.supabase.co/functions/v1/admin-mfa/verify`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+      },
+      body: JSON.stringify({ challengeId, code, email, password }),
+    });
+    const payload = await res.json();
+    if (!res.ok) throw new Error(payload?.error || "Verification failed.");
+    const { error: setErr } = await supabase.auth.setSession({
+      access_token: payload.accessToken,
+      refresh_token: payload.refreshToken,
+    });
+    if (setErr) throw new Error(setErr.message);
   }, []);
 
   const register = useCallback(async (email: string, password: string) => {
@@ -235,6 +293,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       users,
       alerts,
       login,
+      verifyMfa,
       register,
       logout,
       addUser,
@@ -243,7 +302,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       sendAlert,
       refreshAdminData,
     }),
-    [addUser, adminEmail, adminRole, alerts, deleteUser, editUser, isLoggedIn, isReady, login, logout, refreshAdminData, register, sendAlert, users],
+    [addUser, adminEmail, adminRole, alerts, deleteUser, editUser, isLoggedIn, isReady, login, logout, refreshAdminData, register, sendAlert, users, verifyMfa],
   );
 
   return <AdminContext.Provider value={value}>{children}</AdminContext.Provider>;
