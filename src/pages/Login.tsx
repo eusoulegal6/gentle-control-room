@@ -112,15 +112,46 @@ const Login = () => {
             <Shield className="w-7 h-7 text-primary-foreground" />
           </div>
           <CardTitle className="text-2xl font-bold">
-            {isRegister ? "Create Admin Account" : "Admin Login"}
+            {mfaChallengeId ? "Verify Your Identity" : isRegister ? "Create Admin Account" : "Admin Login"}
           </CardTitle>
           <CardDescription>
-            {isRegister
-              ? "Set up your administrator credentials"
-              : "Sign in to manage users and alerts"}
+            {mfaChallengeId
+              ? "Enter the 6-digit code we sent to your email"
+              : isRegister
+                ? "Set up your administrator credentials"
+                : "Sign in to manage users and alerts"}
           </CardDescription>
         </CardHeader>
         <CardContent>
+          {mfaChallengeId ? (
+            <form onSubmit={handleVerifyMfa} className="space-y-4">
+              {info && <p className="text-sm text-muted-foreground">{info}</p>}
+              <div className="space-y-2">
+                <Label htmlFor="mfa-code">Verification code</Label>
+                <Input
+                  id="mfa-code"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  maxLength={6}
+                  placeholder="123456"
+                  value={mfaCode}
+                  onChange={(event) => setMfaCode(event.target.value.replace(/\D/g, ""))}
+                  className="tracking-[0.5em] text-center text-lg"
+                />
+              </div>
+              {error && <p className="text-sm text-destructive">{error}</p>}
+              <Button
+                type="submit"
+                disabled={isSubmitting || mfaCode.length !== 6}
+                className="w-full gradient-primary text-primary-foreground"
+              >
+                {isSubmitting ? "Verifying..." : "Verify & Sign In"}
+              </Button>
+              <Button type="button" variant="ghost" className="w-full" onClick={handleCancelMfa}>
+                Use a different account
+              </Button>
+            </form>
+          ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
