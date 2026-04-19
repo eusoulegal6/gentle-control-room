@@ -293,6 +293,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       users,
       alerts,
       login,
+      verifyMfa,
       register,
       logout,
       addUser,
@@ -301,7 +302,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       sendAlert,
       refreshAdminData,
     }),
-    [addUser, adminEmail, adminRole, alerts, deleteUser, editUser, isLoggedIn, isReady, login, logout, refreshAdminData, register, sendAlert, users],
+    [addUser, adminEmail, adminRole, alerts, deleteUser, editUser, isLoggedIn, isReady, login, logout, refreshAdminData, register, sendAlert, users, verifyMfa],
   );
 
   return <AdminContext.Provider value={value}>{children}</AdminContext.Provider>;
