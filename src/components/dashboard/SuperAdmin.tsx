@@ -54,6 +54,10 @@ const SuperAdmin = () => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editRole, setEditRole] = useState("");
 
+  // 2FA state for the current admin
+  const [mfaEnabled, setMfaEnabled] = useState(false);
+  const [mfaLoading, setMfaLoading] = useState(false);
+
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
@@ -69,6 +73,55 @@ const SuperAdmin = () => {
       setLoading(false);
     }
   }, [toast]);
+
+  const loadMfa = useCallback(async () => {
+    try {
+      const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      const res = await fetch(`https://${projectId}.supabase.co/functions/v1/admin-mfa/settings`, {
+        headers: {
+          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
+      const data = await res.json();
+      if (res.ok) setMfaEnabled(!!data.enabled);
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  const toggleMfa = async (next: boolean) => {
+    setMfaLoading(true);
+    try {
+      const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Not signed in.");
+      const res = await fetch(`https://${projectId}.supabase.co/functions/v1/admin-mfa/settings`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ enabled: next }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || "Failed to update.");
+      setMfaEnabled(!!data.enabled);
+      toast({
+        title: next ? "Two-step verification enabled" : "Two-step verification disabled",
+        description: next
+          ? "You'll be asked for an email code on your next sign-in."
+          : "Future sign-ins will use password only.",
+      });
+    } catch (e) {
+      toast({ title: "Error", description: e instanceof Error ? e.message : "Failed", variant: "destructive" });
+    } finally {
+      setMfaLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (adminRole === "super_admin") loadData();
