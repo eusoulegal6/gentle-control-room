@@ -55,7 +55,7 @@ Deno.serve(async (req) => {
     // Verify admin
     const { data: adminProfile } = await supabase
       .from("admin_profiles")
-      .select("id, email")
+      .select("id, email, role")
       .eq("id", adminId)
       .single();
 
@@ -66,13 +66,20 @@ Deno.serve(async (req) => {
       });
     }
 
-    // LIST alerts
+    const isSuperAdmin = adminProfile.role === "super_admin";
+
+    // LIST alerts (scoped to current admin unless super)
     if (req.method === "GET") {
-      const { data: alerts, error } = await supabase
+      let query = supabase
         .from("alerts")
         .select("*")
         .order("created_at", { ascending: false });
 
+      if (!isSuperAdmin) {
+        query = query.eq("created_by", adminId);
+      }
+
+      const { data: alerts, error } = await query;
       if (error) throw error;
 
       const serialized = (alerts || []).map((a) => serializeAlert(a));
@@ -102,11 +109,17 @@ Deno.serve(async (req) => {
         });
       }
 
-      // Fetch all recipients in one query
-      const { data: recipients } = await supabase
+      // Fetch recipients — scoped to this admin's own staff (super sees all)
+      let recipientsQuery = supabase
         .from("desktop_users")
-        .select("id, username, status")
+        .select("id, username, status, created_by")
         .in("id", ids);
+
+      if (!isSuperAdmin) {
+        recipientsQuery = recipientsQuery.eq("created_by", adminId);
+      }
+
+      const { data: recipients } = await recipientsQuery;
 
       if (!recipients || recipients.length === 0) {
         return new Response(JSON.stringify({ error: "No valid recipients found" }), {

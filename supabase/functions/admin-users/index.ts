@@ -39,7 +39,7 @@ Deno.serve(async (req) => {
     // Verify admin profile exists
     const { data: adminProfile } = await supabase
       .from("admin_profiles")
-      .select("id")
+      .select("id, role")
       .eq("id", adminId)
       .single();
 
@@ -54,22 +54,43 @@ Deno.serve(async (req) => {
     const pathParts = url.pathname.split("/").filter(Boolean);
     const userId = pathParts.length > 1 ? pathParts[pathParts.length - 1] : null;
 
+    const isSuperAdmin = adminProfile.role === "super_admin";
+
+    // Helper: ensure target user belongs to this admin (or super)
+    async function assertOwnsUser(id: string): Promise<boolean> {
+      if (isSuperAdmin) return true;
+      const { data } = await supabase
+        .from("desktop_users")
+        .select("created_by")
+        .eq("id", id)
+        .maybeSingle();
+      return !!data && data.created_by === adminId;
+    }
+
     // LIST
     if (req.method === "GET" && !userId) {
-      const { data: users, error } = await supabase
+      let query = supabase
         .from("desktop_users")
         .select("id, username, display_name, status, created_at, updated_at, created_by")
         .order("created_at", { ascending: false });
 
+      if (!isSuperAdmin) {
+        query = query.eq("created_by", adminId);
+      }
+
+      const { data: users, error } = await query;
       if (error) throw error;
 
-      const { data: alertCounts } = await supabase
-        .from("alerts")
-        .select("recipient_id");
-
-      const countMap: Record<string, number> = {};
-      for (const a of alertCounts || []) {
-        countMap[a.recipient_id] = (countMap[a.recipient_id] || 0) + 1;
+      const userIds = (users || []).map((u) => u.id);
+      let countMap: Record<string, number> = {};
+      if (userIds.length > 0) {
+        const { data: alertCounts } = await supabase
+          .from("alerts")
+          .select("recipient_id")
+          .in("recipient_id", userIds);
+        for (const a of alertCounts || []) {
+          countMap[a.recipient_id] = (countMap[a.recipient_id] || 0) + 1;
+        }
       }
 
       const serialized = (users || []).map((u) => ({
@@ -146,6 +167,13 @@ Deno.serve(async (req) => {
 
     // UPDATE
     if (req.method === "PATCH" && userId) {
+      if (!(await assertOwnsUser(userId))) {
+        return new Response(JSON.stringify({ error: "Forbidden" }), {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
       const body = await req.json();
       const updates: Record<string, unknown> = {};
 
@@ -188,6 +216,12 @@ Deno.serve(async (req) => {
 
     // DELETE
     if (req.method === "DELETE" && userId) {
+      if (!(await assertOwnsUser(userId))) {
+        return new Response(JSON.stringify({ error: "Forbidden" }), {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
       const { error } = await supabase.from("desktop_users").delete().eq("id", userId);
       if (error) throw error;
       return new Response(null, { status: 204, headers: corsHeaders });
