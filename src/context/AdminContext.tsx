@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { AdminContext, useAdmin, type AdminContextType, type AppUser, type Alert, type LoginResult } from "./admin-context-base";
 
@@ -15,7 +15,6 @@ async function invokeEdgeFunction<T>(functionName: string, options?: {
   });
 
   if (error) {
-    // Try to extract message from the error
     const message = typeof error === "object" && "message" in error
       ? (error as { message: string }).message
       : String(error);
@@ -25,7 +24,6 @@ async function invokeEdgeFunction<T>(functionName: string, options?: {
   return data as T;
 }
 
-// For edge functions that need path-based routing, we construct the full URL
 async function invokeEdgeFunctionWithPath<T>(functionName: string, path: string, options?: {
   method?: string;
   body?: unknown;
@@ -67,6 +65,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [users, setUsers] = useState<AppUser[]>([]);
   const [alerts, setAlerts] = useState<Alert[]>([]);
+  const suppressAuthSideEffectsRef = useRef(false);
 
   const refreshAdminData = useCallback(async () => {
     const [usersPayload, alertsPayload] = await Promise.all([
@@ -79,43 +78,62 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, []);
 
   const login = useCallback(async (email: string, password: string): Promise<LoginResult> => {
-    const { data: signIn, error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) throw new Error(error.message);
-    if (!signIn.user?.id) throw new Error("Sign-in failed.");
+    suppressAuthSideEffectsRef.current = true;
 
-    // Check if MFA is enabled for this admin
-    const { data: mfaSettings } = await supabase
-      .from("admin_mfa_settings")
-      .select("enabled")
-      .eq("admin_id", signIn.user.id)
-      .maybeSingle();
+    try {
+      const { data: signIn, error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) throw new Error(error.message);
+      if (!signIn.user?.id) throw new Error("Sign-in failed.");
 
-    if (!mfaSettings?.enabled) {
-      return { kind: "signed_in" };
+      const { data: mfaSettings } = await supabase
+        .from("admin_mfa_settings")
+        .select("enabled")
+        .eq("admin_id", signIn.user.id)
+        .maybeSingle();
+
+      if (!mfaSettings?.enabled) {
+        const { data: profile } = await supabase
+          .from("admin_profiles")
+          .select("role")
+          .eq("id", signIn.user.id)
+          .single();
+
+        suppressAuthSideEffectsRef.current = false;
+        setAdminEmail(signIn.user.email ?? email);
+        setAdminRole(profile?.role ?? "admin");
+        setIsLoggedIn(true);
+        refreshAdminData().catch(console.error);
+        return { kind: "signed_in" };
+      }
+
+      const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+      const res = await fetch(`https://${projectId}.supabase.co/functions/v1/admin-mfa/challenge`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        },
+        body: JSON.stringify({ email, password }),
+      });
+      const payload = await res.json();
+
+      await supabase.auth.signOut();
+      suppressAuthSideEffectsRef.current = false;
+
+      if (!res.ok) throw new Error(payload?.error || "Failed to start verification.");
+
+      return {
+        kind: "mfa_required",
+        challengeId: payload.challengeId,
+        email,
+        password,
+        emailDeliveryWarning: payload.emailDeliveryWarning ?? null,
+      };
+    } catch (error) {
+      suppressAuthSideEffectsRef.current = false;
+      throw error;
     }
-
-    // MFA enabled — sign out the temporary session and request a challenge
-    await supabase.auth.signOut();
-
-    const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
-    const res = await fetch(`https://${projectId}.supabase.co/functions/v1/admin-mfa/challenge`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-      },
-      body: JSON.stringify({ email, password }),
-    });
-    const payload = await res.json();
-    if (!res.ok) throw new Error(payload?.error || "Failed to start verification.");
-    return {
-      kind: "mfa_required",
-      challengeId: payload.challengeId,
-      email,
-      password,
-      emailDeliveryWarning: payload.emailDeliveryWarning ?? null,
-    };
-  }, []);
+  }, [refreshAdminData]);
 
   const verifyMfa = useCallback(async (challengeId: string, code: string, email: string, password: string) => {
     const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
@@ -139,7 +157,6 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const register = useCallback(async (email: string, password: string) => {
     const { error } = await supabase.auth.signUp({ email, password });
     if (error) throw new Error(error.message);
-    // Admin profile is auto-created via database trigger
   }, []);
 
   const logout = useCallback(async () => {
@@ -180,13 +197,16 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, []);
 
   useEffect(() => {
-    // Set up auth state listener BEFORE checking session
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (suppressAuthSideEffectsRef.current) {
+        setIsReady(true);
+        return;
+      }
+
       if (session?.user) {
         setAdminEmail(session.user.email ?? "");
         setIsLoggedIn(true);
 
-        // Fetch admin role
         supabase
           .from("admin_profiles")
           .select("role")
@@ -196,7 +216,6 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             setAdminRole(data?.role ?? "admin");
           });
 
-        // Use setTimeout to avoid potential Supabase deadlock
         if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
           setTimeout(() => {
             refreshAdminData().catch(console.error);
@@ -212,8 +231,12 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       setIsReady(true);
     });
 
-    // Check existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
+      if (suppressAuthSideEffectsRef.current) {
+        setIsReady(true);
+        return;
+      }
+
       if (session?.user) {
         setAdminEmail(session.user.email ?? "");
         setIsLoggedIn(true);
