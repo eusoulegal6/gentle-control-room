@@ -11,6 +11,7 @@ import DashboardHome from "@/components/dashboard/DashboardHome";
 import DesktopApp from "@/components/dashboard/DesktopApp";
 import GroupManagement from "@/components/dashboard/GroupManagement";
 import SuperAdmin from "@/components/dashboard/SuperAdmin";
+import AccountSettings from "@/components/dashboard/AccountSettings";
 import { useAdmin } from "@/context/AdminContext";
 
 const Dashboard = () => {
@@ -44,6 +45,7 @@ const Dashboard = () => {
               <Route path="alerts" element={<AlertHistory />} />
               <Route path="desktop-app" element={<DesktopApp />} />
               <Route path="super-admin" element={<SuperAdmin />} />
+              <Route path="account" element={<AccountSettings />} />
               <Route path="*" element={<Navigate to="/dashboard" replace />} />
             </Routes>
           </main>

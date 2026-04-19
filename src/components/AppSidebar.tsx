@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users, Send, History, Shield, Monitor, FolderOpen, Crown } from "lucide-react";
+import { LayoutDashboard, Users, Send, History, Shield, Monitor, FolderOpen, Crown, UserCircle } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
 import { useAdmin } from "@/context/AdminContext";
@@ -20,6 +20,7 @@ const items = [
   { title: "Send Alert", url: "/dashboard/send-alert", icon: Send },
   { title: "Alert History", url: "/dashboard/alerts", icon: History },
   { title: "Desktop App", url: "/dashboard/desktop-app", icon: Monitor },
+  { title: "Account Settings", url: "/dashboard/account", icon: UserCircle },
 ];
 
 const superAdminItem = { title: "Super Admin", url: "/dashboard/super-admin", icon: Crown };
