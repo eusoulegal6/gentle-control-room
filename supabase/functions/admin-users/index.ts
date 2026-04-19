@@ -39,7 +39,7 @@ Deno.serve(async (req) => {
     // Verify admin profile exists
     const { data: adminProfile } = await supabase
       .from("admin_profiles")
-      .select("id")
+      .select("id, role")
       .eq("id", adminId)
       .single();
 
