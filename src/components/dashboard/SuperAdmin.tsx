@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Shield, UserCog, BarChart3, Pencil, Trash2, Save, X } from "lucide-react";
+import { Shield, UserCog, BarChart3, Pencil, Trash2, Save, X, KeyRound } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAdmin } from "@/context/AdminContext";
 import { Button } from "@/components/ui/button";
@@ -7,6 +7,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 
 interface AdminProfile {

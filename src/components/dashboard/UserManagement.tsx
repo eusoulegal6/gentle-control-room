@@ -182,13 +182,16 @@ const UserManagement = () => {
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-2">
-              <Label>Username</Label>
+              <Label>Username (email format)</Label>
               <Input
-                placeholder="e.g. john.doe"
+                type="email"
+                placeholder="e.g. john.doe@yourcompany.com"
                 value={form.username}
                 onChange={(event) => setForm((current) => ({ ...current, username: event.target.value }))}
               />
-              <p className="text-xs text-muted-foreground">This will be the login username for the Windows app.</p>
+              <p className="text-xs text-muted-foreground">
+                Must be in email format (e.g. <code>name@example.com</code>). It does <strong>not</strong> need to be a real, working email — it's just used as a unique login identifier.
+              </p>
             </div>
             <div className="space-y-2">
               <Label>Display Name</Label>
