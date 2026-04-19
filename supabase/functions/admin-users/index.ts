@@ -167,6 +167,13 @@ Deno.serve(async (req) => {
 
     // UPDATE
     if (req.method === "PATCH" && userId) {
+      if (!(await assertOwnsUser(userId))) {
+        return new Response(JSON.stringify({ error: "Forbidden" }), {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
       const body = await req.json();
       const updates: Record<string, unknown> = {};
 
@@ -209,6 +216,12 @@ Deno.serve(async (req) => {
 
     // DELETE
     if (req.method === "DELETE" && userId) {
+      if (!(await assertOwnsUser(userId))) {
+        return new Response(JSON.stringify({ error: "Forbidden" }), {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
       const { error } = await supabase.from("desktop_users").delete().eq("id", userId);
       if (error) throw error;
       return new Response(null, { status: 204, headers: corsHeaders });
