@@ -132,35 +132,10 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const login = useCallback(async (email: string, password: string): Promise<LoginResult> => {
     const { data: signIn, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw new Error(error.message);
-    const userId = signIn.user?.id;
-    if (!userId) throw new Error("Sign-in failed.");
+    if (!signIn.user?.id) throw new Error("Sign-in failed.");
 
     // 2FA temporarily disabled (Resend email delivery issue) — always sign in directly.
     return { kind: "signed_in" };
-    // eslint-disable-next-line no-unreachable
-    const _userIdRef = userId;
-
-    // MFA enabled — sign out and request a challenge via the edge function
-    await supabase.auth.signOut();
-
-    const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
-    const res = await fetch(`https://${projectId}.supabase.co/functions/v1/admin-mfa/challenge`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-      },
-      body: JSON.stringify({ email, password }),
-    });
-    const payload = await res.json();
-    if (!res.ok) throw new Error(payload?.error || "Could not start verification.");
-    return {
-      kind: "mfa_required",
-      challengeId: payload.challengeId,
-      email,
-      password,
-      emailDeliveryWarning: payload.emailDeliveryWarning ?? null,
-    };
   }, []);
 
   const verifyMfa = useCallback(async (challengeId: string, code: string, email: string, password: string) => {
