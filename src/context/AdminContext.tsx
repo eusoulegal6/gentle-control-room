@@ -135,15 +135,10 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const userId = signIn.user?.id;
     if (!userId) throw new Error("Sign-in failed.");
 
-    const { data: mfa } = await supabase
-      .from("admin_mfa_settings")
-      .select("enabled")
-      .eq("admin_id", userId)
-      .maybeSingle();
-
-    if (!mfa?.enabled) {
-      return { kind: "signed_in" };
-    }
+    // 2FA temporarily disabled (Resend email delivery issue) — always sign in directly.
+    return { kind: "signed_in" };
+    // eslint-disable-next-line no-unreachable
+    const _userIdRef = userId;
 
     // MFA enabled — sign out and request a challenge via the edge function
     await supabase.auth.signOut();
