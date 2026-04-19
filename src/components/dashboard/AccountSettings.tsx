@@ -108,14 +108,19 @@ const AccountSettings = () => {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center justify-between rounded-lg border p-4 opacity-60">
+          <div className="flex items-center justify-between rounded-lg border p-4">
             <div className="space-y-1">
               <Label htmlFor="mfa-toggle" className="text-base">Require email code on sign-in</Label>
               <p className="text-xs text-muted-foreground">
-                Temporarily unavailable while email delivery is being reconfigured.
+                When enabled, a 6-digit code is emailed to {adminEmail} on each sign-in.
               </p>
             </div>
-            <Switch id="mfa-toggle" checked={false} disabled />
+            <Switch
+              id="mfa-toggle"
+              checked={mfaEnabled}
+              disabled={mfaLoading}
+              onCheckedChange={toggleMfa}
+            />
           </div>
         </CardContent>
       </Card>
