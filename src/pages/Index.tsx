@@ -637,12 +637,13 @@ const Index = () => {
             </div>
             <div className="p-6 pt-4">
               <div className="rounded-xl overflow-hidden bg-black aspect-video">
-                <video
-                  src="https://ipwmfdsnzjhzeofwwptk.supabase.co/storage/v1/object/public/downloads/demo.mp4"
-                  controls
-                  autoPlay
-                  playsInline
-                  className="block w-full h-full object-contain"
+                <iframe
+                  src="https://player.vimeo.com/video/1186548240?autoplay=1&title=0&byline=0&portrait=0&dnt=1"
+                  title="Emergency Staff Alert — Demo"
+                  allow="autoplay; fullscreen; picture-in-picture; clipboard-write; encrypted-media"
+                  allowFullScreen
+                  className="block w-full h-full"
+                  frameBorder={0}
                 />
               </div>
             </div>
